@@ -1,0 +1,10 @@
+{
+  "eeprom": [
+    {
+      "name": "eeprom_readability",
+      "module": "tests/transceiver/eeprom/test_eeprom_basic.py",
+      "function": "test_eeprom_content_verification_via_show_cli"
+    }
+  ],
+  "dom": []
+}

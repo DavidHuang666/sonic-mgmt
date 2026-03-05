@@ -804,9 +804,12 @@ def ptfhosts(enhance_inventory, ansible_adhoc, tbinfo, duthost, request):
     else:
         # when no ptf defined in testbed.csv
         # try to parse it from inventory
-        ptf_host = duthost.host.options["inventory_manager"].get_host(duthost.hostname).get_vars()["ptf_host"]
-        _hosts.append(PTFHost(ansible_adhoc, ptf_host, duthost, tbinfo,
-                              macsec_enabled=request.config.option.enable_macsec))
+        #ptf_host = duthost.host.options["inventory_manager"].get_host(duthost.hostname).get_vars()["ptf_host"]
+        #_hosts.append(PTFHost(ansible_adhoc, ptf_host, duthost, tbinfo,
+        #                      macsec_enabled=request.config.option.enable_macsec))
+        logger.warning("No PTF required, using dummy localhost PTF")
+        return [PTFHost(ansible_adhoc, "localhost", duthost, tbinfo, macsec_enabled=request.config.option.enable_macsec)]
+
     return _hosts
 
 
@@ -3835,6 +3838,7 @@ def yang_validation_check(request, duthosts):
 
     if skip_yang:
         logger.info("Skipping YANG validation check due to --skip_yang flag")
+        yield
         return
 
     def run_yang_validation(stage):

@@ -1,0 +1,21 @@
+[1mdiff --git a/tests/transceiver/eeprom/test_eeprom_basic.py b/tests/transceiver/eeprom/test_eeprom_basic.py[m
+[1mindex ad92c1f8d..c7a480357 100644[m
+[1m--- a/tests/transceiver/eeprom/test_eeprom_basic.py[m
+[1m+++ b/tests/transceiver/eeprom/test_eeprom_basic.py[m
+[36m@@ -2,7 +2,7 @@[m [mimport pytest[m
+ from tests.transceiver.utils.cli_parser_helper import parse_eeprom[m
+ [m
+ pytestmark = [[m
+[31m-    pytest.mark.topology('ptp-256')[m
+[32m+[m[32m    pytest.mark.topology('ptp-256', 'm0')[m
+ ][m
+ [m
+ CMD_SFP_EEPROM = "show interfaces transceiver info"[m
+[36m@@ -27,6 +27,7 @@[m [mdef test_eeprom_content_verification_via_show_cli(duthost, port_attributes_dict)[m
+     Runs one CLI command, parses output per port, and validates expected EEPROM fields[m
+     against attributes from port_attributes_dict. Aggregates all failures for reporting.[m
+     """[m
+[32m+[m[32m    print("port_attributes_dict:", port_attributes_dict)[m
+     if duthost.facts.get("asic_type") == "vs":[m
+         pytest.skip("Skipping EEPROM verification on virtual switch testbed")[m
+ [m

@@ -1,0 +1,15 @@
+{
+  "deployment_templates": {
+    "2x100G_200G_SIDE": {
+      "required_attributes": {
+        "BASE_ATTRIBUTES": ["vendor_name", "vendor_pn", "cable_type", "speed_gbps", "deployment"],
+        "EEPROM_ATTRIBUTES": ["dual_bank_supported", "vdm_supported"],
+        "DOM_ATTRIBUTES": ["temperature", "voltage", "tx_power", "alarm_flags"]
+      },
+      "optional_attributes": {
+        "BASE_ATTRIBUTES": ["hardware_rev", "vendor_rev"],
+        "CDB_FW_ATTRIBUTES": ["firmware_upgrade_support"]
+      }
+    }
+  }
+}

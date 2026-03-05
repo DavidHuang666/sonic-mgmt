@@ -1,0 +1,17 @@
+all:
+  children:
+    sonic:
+      vars:
+        os: sonic
+        ansible_network_os: sonic
+        ansible_connection: ssh
+        ansible_become: true
+        ansible_become_method: sudo
+      hosts:
+        str-nexthop_4010-01:
+          ansible_host: 11.16.45.5
+          ansible_user: admin
+          ansible_password: YourPaSsWoRd
+          ansible_become_password: YourPaSsWoRd
+          hwsku: NH-4010
+          iface_speed: 800000

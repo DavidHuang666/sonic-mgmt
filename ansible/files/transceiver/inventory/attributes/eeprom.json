@@ -1,0 +1,22 @@
+{
+  "mandatory": ["dual_bank_supported"],
+  "defaults": {
+    "vdm_supported": false,
+    "is_non_dac_and_cmis": true,
+    "eeprom_dump_timeout_sec": 5
+  },
+  "transceivers": {
+    "vendors": {
+      "ACCELIGHT": {
+        "part_numbers": {
+          "AGP80SC0CW41002": {
+            "dual_bank_supported": true,
+            "gold_firmware_version": "3.1.0",
+            "inactive_firmware_version": "0.3.0",
+            "cmis_revision": "5.0"
+          }
+        }
+      }
+    }
+  }
+}

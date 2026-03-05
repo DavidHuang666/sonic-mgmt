@@ -1,0 +1,70 @@
+{
+  "defaults": {
+    "data_max_age_min": 5,
+    "max_update_time_sec": 150,
+    "consistency_check_poll_count": 3,
+    "shutdown_tx_bias_threshold": 1.0,
+    "shutdown_tx_power_threshold": -30.0,
+    "shutdown_rx_power_threshold": -30.0
+  },
+  "transceivers": {
+    "vendors": {
+      "ACCELIGHT": {
+        "part_numbers": {
+          "AGP80SC0CW41002": {
+            "temperature_operational_range": {
+              "min": 0.0,
+              "max": 70.0
+            },
+            "voltage_operational_range": {
+              "min": 3.15,
+              "max": 3.45
+            },
+            "txLANE_NUMpower_operational_range": {
+              "min": -4.0,
+              "max": 3.0
+            },
+            "rxLANE_NUMpower_operational_range": {
+              "min": -4.0,
+              "max": 3.0
+            },
+            "txLANE_NUMbias_operational_range": {
+              "min": 20.0,
+              "max": 350.0
+            },
+            "temperature_threshold_range": {
+              "lowalarm": -8.0,
+              "lowwarning": -3.0,
+              "highwarning": 73.0,
+              "highalarm": 78.0
+            },
+            "voltage_threshold_range": {
+              "lowalarm": 2.97,
+              "lowwarning": 3.13,
+              "highwarning": 3.46,
+              "highalarm": 3.63
+            },
+            "rx_power_threshold_range": {
+              "lowalarm": -9.8,
+              "lowwarning": -8.8,
+              "highwarning": 5.0,
+              "highalarm": 6.0
+            },
+            "tx_power_threshold_range": {
+              "lowalarm": -5.3,
+              "lowwarning": -4.3,
+              "highwarning": 4.5,
+              "highalarm": 5.5
+            },
+            "tx_bias_threshold_range": {
+              "lowalarm": 10,
+              "lowwarning": 15,
+              "highwarning": 380,
+              "highalarm": 400
+            }
+          }
+        }
+      }
+    }
+  }
+}

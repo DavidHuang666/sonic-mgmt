@@ -1,0 +1,29 @@
+{
+  "transceivers": {
+    "vendors": {
+      "accelight": {
+        "part_numbers": {
+          "AGP80SC0CW41002": {
+            "temperature_threshold_range": {"lowalarm": -40.0, "lowwarning": -5.0, "highwarning": 75.0, "highalarm": 85.0},
+            "voltage_threshold_range": {"lowalarm": 2.97, "lowwarning": 3.135, "highwarning": 3.465, "highalarm": 3.63},
+            "rx_power_threshold_range": {"lowalarm": -20.801, "lowwarning": -16.801, "highwarning": 5.0, "highalarm": 6.0},
+            "tx_power_threshold_range": {"lowalarm": -5.3, "lowwarning": -4.3, "highwarning": 4.5, "highalarm": 5.5},
+            "tx_bias_threshold_range": {"lowalarm": 10.0, "lowwarning": 15.0, "highwarning": 380.0, "highalarm": 400.0},
+            "temperature_operational_range": { "min": 0, "max": 70 },
+            "voltage_operational_range": { "min": 3.15, "max": 3.45 },
+            "txLANE_NUMpower_operational_range": { "min": -7, "max": 3 },
+            "rxLANE_NUMpower_operational_range": { "min": -7, "max": 3 },
+            "txLANE_NUMbias_operational_range": { "min": 20, "max": 350 }
+
+          }
+        }
+      }
+    }
+  },
+
+  "platform": {
+    "data_max_age_min": 5,
+    "consistency_check_poll_count": 3,
+    "max_update_time_sec": 60
+  }
+}

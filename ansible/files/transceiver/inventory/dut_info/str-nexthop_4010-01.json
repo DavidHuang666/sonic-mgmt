@@ -1,0 +1,22 @@
+{
+  "Ethernet0,Ethernet8": {
+    "vendor_name": "Accelight",
+    "vendor_pn": "AGP80SC0CW41002",
+    "vendor_date": "2024-07-04",
+    "vendor_oui": "00-00-00",
+    "vendor_rev": "01",
+    "hardware_rev": "1.0"
+  },
+  "Ethernet0": {
+    "vendor_sn": "W5027810000003"
+  },
+  "Ethernet8": {
+    "vendor_sn": "W5027810000039"
+  },
+  "Ethernet0": {
+    "transceiver_configuration": "FR-400-OSFP-400G_STRAIGHT-0x0F-0x0F"
+  },
+  "Ethernet8": {
+    "transceiver_configuration": "FR-400-OSFP-400G_STRAIGHT-0x0F-0x0F"
+  }
+}
