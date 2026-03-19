@@ -12,6 +12,8 @@ def test_dom_data_consistency_verification(
     dom_port_context,
     dom_operational_fields_by_port,
     dom_operational_ranges_by_port,
+    dom_consistency_variation_thresholds_by_port,
+    dom_consistency_variation_rules,
     dom_db_reader,
     parse_dom_numeric,
     parse_dom_update_time,
@@ -27,8 +29,15 @@ def test_dom_data_consistency_verification(
         dom_attrs = dom_port_context[port]["dom"]
         expected_fields = dom_operational_fields_by_port.get(port, [])
         field_ranges = dom_operational_ranges_by_port.get(port, {})
+        variation_config = dom_consistency_variation_thresholds_by_port.get(port, {})
         field_failures = []
         invalid_range_attrs = set()
+        invalid_variation_rule_attrs = set()
+
+        for error in variation_config.get("errors", []):
+            field_failures.append(error)
+
+        variation_thresholds = variation_config.get("thresholds", {})
 
         poll_count_raw = dom_attrs.get("consistency_check_poll_count")
         poll_interval_raw = dom_attrs.get("max_update_time_sec")
@@ -135,12 +144,41 @@ def test_dom_data_consistency_verification(
                         )
                     )
 
-                # "Reasonable variation" is evaluated against configured operational span.
-                allowed_delta = max_cfg - min_cfg
-                if abs(curr_val - prev_val) > allowed_delta:
+                variation_rule = dom_consistency_variation_rules.get(attr_name)
+                if variation_rule is None:
+                    if attr_name not in invalid_variation_rule_attrs:
+                        field_failures.append(
+                            "{} has no mapped consistency variation threshold rule".format(attr_name)
+                        )
+                        invalid_variation_rule_attrs.add(attr_name)
+                    continue
+
+                threshold_attr, mode = variation_rule
+                threshold_value = variation_thresholds.get(threshold_attr)
+                if threshold_value is None:
+                    if threshold_attr not in invalid_variation_rule_attrs:
+                        field_failures.append(
+                            "{} missing parsed variation threshold {}".format(attr_name, threshold_attr)
+                        )
+                        invalid_variation_rule_attrs.add(threshold_attr)
+                    continue
+
+                if mode == "abs":
+                    allowed_delta = threshold_value
+                elif mode == "pct":
+                    allowed_delta = abs(prev_val) * threshold_value / 100.0
+                else:
+                    if attr_name not in invalid_variation_rule_attrs:
+                        field_failures.append("{} has invalid consistency variation mode {}".format(attr_name, mode))
+                        invalid_variation_rule_attrs.add(attr_name)
+                    continue
+
+                delta = abs(curr_val - prev_val)
+                if delta > allowed_delta:
                     field_failures.append(
-                        "{} unreasonable change between polls (prev={}, curr={}, allowed_max_delta={})".format(
-                            field, prev_val, curr_val, allowed_delta
+                        "{} unreasonable change between polls (prev={}, curr={}, delta={}, "
+                        "allowed_delta={}, threshold_attr={})".format(
+                            field, prev_val, curr_val, delta, allowed_delta, threshold_attr
                         )
                     )
 

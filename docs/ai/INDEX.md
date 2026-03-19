@@ -35,6 +35,8 @@ of the transceiver DOM test framework.
 - `dom_ports`: DOM-enabled port list sorted by interface prefix + numeric suffix (e.g., `Ethernet0, Ethernet4, Ethernet8, Ethernet12`).
 - `dom_operational_fields_by_port`: Expands configured operational attributes to expected sensor fields, including `LANE_NUM` lane expansion.
 - `dom_operational_ranges_by_port`: Builds per-port `field -> {attr_name, min, max}` maps for operational-range-aware validations.
+- `dom_consistency_variation_rules`: Operational-attribute to variation-threshold mapping used by TC4.
+- `dom_consistency_variation_thresholds_by_port`: Validates and parses per-port consistency variation threshold attributes from `DOM_ATTRIBUTES`.
 - `dom_threshold_fields_by_port`: Builds threshold key mappings for `TRANSCEIVER_DOM_THRESHOLD`.
 - `dom_sensor_by_port` / `dom_threshold_by_port`: Bulk reads from STATE_DB hash tables.
 - `dom_db_reader`: Callable fixture for repeated sensor/threshold reads during polling tests.
@@ -51,7 +53,7 @@ of the transceiver DOM test framework.
 - `tests/transceiver/dom/test_dom_threshold.py`
   - TC3: threshold comparison, completeness, hierarchy validation, operational-vs-warning boundary checks.
 - `tests/transceiver/dom/test_dom_consistency.py`
-  - TC4: polling-based consistency checks with timestamp progression and operational-range-aware variation validation; `consistency_check_poll_count` and `max_update_time_sec` are treated as required config for this test and missing/invalid values fail explicitly.
+  - TC4: polling-based consistency checks with timestamp progression and threshold-driven variation validation using flat consistency threshold attributes (`tx/rx power`, `tx bias`, `laser/module temperature`, `voltage`); `consistency_check_poll_count` and `max_update_time_sec` are treated as required config for this test and missing/invalid values fail explicitly.
 - `tests/transceiver/dom/advanced/test_dom_interface_state.py`
   - Advanced TC1 skeleton (currently explicit skip).
 - `tests/transceiver/dom/advanced/test_dom_polling.py`
