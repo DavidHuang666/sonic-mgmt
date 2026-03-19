@@ -26,6 +26,28 @@ THRESHOLD_PREFIX_OVERRIDES = {
     "laser_temperature": "lasertemp",
 }
 
+CONSISTENCY_VARIATION_THRESHOLD_ATTRS = (
+    "tx_power_consistency_variation_threshold",
+    "rx_power_consistency_variation_threshold",
+    "tx_bias_consistency_variation_threshold",
+    "laser_temperature_consistency_variation_threshold",
+    "temperature_consistency_variation_threshold",
+    "voltage_consistency_variation_threshold",
+)
+
+# operational range attribute -> (threshold attribute, mode)
+# mode:
+# - abs: absolute delta check
+# - pct: percentage-of-previous-value delta check
+CONSISTENCY_VARIATION_RULES = {
+    "txLANE_NUMpower_operational_range": ("tx_power_consistency_variation_threshold", "abs"),
+    "rxLANE_NUMpower_operational_range": ("rx_power_consistency_variation_threshold", "abs"),
+    "txLANE_NUMbias_operational_range": ("tx_bias_consistency_variation_threshold", "pct"),
+    "laser_temperature_operational_range": ("laser_temperature_consistency_variation_threshold", "abs"),
+    "temperature_operational_range": ("temperature_consistency_variation_threshold", "abs"),
+    "voltage_operational_range": ("voltage_consistency_variation_threshold", "abs"),
+}
+
 _FLOAT_PATTERN = re.compile(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?")
 _PORT_SUFFIX_PATTERN = re.compile(r"^(.*?)(\d+)$")
 
@@ -199,6 +221,32 @@ def _threshold_field_map(attr_name):
     return {suffix: "{}{}".format(prefix, suffix) for suffix in THRESHOLD_FIELD_SUFFIXES}
 
 
+def _parse_consistency_variation_thresholds(dom_attrs):
+    thresholds = {}
+    errors = []
+    for attr_name in CONSISTENCY_VARIATION_THRESHOLD_ATTRS:
+        raw_value = dom_attrs.get(attr_name)
+        if raw_value is None:
+            errors.append("missing required DOM attribute {} for consistency variation validation".format(attr_name))
+            continue
+
+        numeric = _parse_numeric(raw_value)
+        if numeric is None:
+            errors.append("{} is non-numeric in DOM_ATTRIBUTES (raw={!r})".format(attr_name, raw_value))
+            continue
+
+        if numeric < 0:
+            errors.append("{} must be >= 0, got {}".format(attr_name, numeric))
+            continue
+
+        thresholds[attr_name] = float(numeric)
+
+    return {
+        "thresholds": thresholds,
+        "errors": errors,
+    }
+
+
 @pytest.fixture(scope="module")
 def dom_port_context(port_attributes_dict):
     context = {}
@@ -241,6 +289,19 @@ def dom_operational_ranges_by_port(dom_port_context):
         lane_count = _get_lane_count(context["base"])
         ranges_by_port[port] = _build_operational_field_range_map(dom_attrs, lane_count)
     return ranges_by_port
+
+
+@pytest.fixture(scope="module")
+def dom_consistency_variation_rules():
+    return dict(CONSISTENCY_VARIATION_RULES)
+
+
+@pytest.fixture(scope="module")
+def dom_consistency_variation_thresholds_by_port(dom_port_context):
+    thresholds_by_port = {}
+    for port, context in dom_port_context.items():
+        thresholds_by_port[port] = _parse_consistency_variation_thresholds(context["dom"])
+    return thresholds_by_port
 
 
 @pytest.fixture(scope="module")
