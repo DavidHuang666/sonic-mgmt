@@ -1,9 +1,5 @@
 import pytest
 
-pytestmark = [
-    pytest.mark.topology("ptp-256", "m0"),
-]
-
 THRESHOLD_SUFFIX = "_threshold_range"
 VALUE_TOLERANCE = 0.01
 

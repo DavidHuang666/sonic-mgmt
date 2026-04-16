@@ -67,6 +67,7 @@ of the transceiver DOM test framework.
 - DOM failure reporting style now follows EEPROM aggregation style: grouped by port with indented per-field/per-check failure details.
 - DOM tests now use EEPROM-like result control flow: `field_failures`/`all_failures` + `has_configured_checks`, without per-port/pass counters such as `port_validated` or `validated_ports`.
 - DOM test files include explicit step comments to align code blocks with the corresponding test-plan execution steps.
+- Basic DOM TC1-TC4 test files do not declare explicit topology markers; topology selection is left to the shared pytest/testbed infrastructure.
 
 ## EEPROM Bring-Up Notes
 - Inventory files updated for Accelight OSFP module bring-up:

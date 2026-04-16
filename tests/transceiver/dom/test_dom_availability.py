@@ -1,9 +1,5 @@
 import pytest
 
-pytestmark = [
-    pytest.mark.topology("ptp-256", "m0"),
-]
-
 
 def test_dom_data_availability_verification(
     duthost,
