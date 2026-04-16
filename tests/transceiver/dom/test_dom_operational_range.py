@@ -1,9 +1,5 @@
 import pytest
 
-pytestmark = [
-    pytest.mark.topology("ptp-256", "m0"),
-]
-
 OPERATIONAL_SUFFIX = "_operational_range"
 
 
