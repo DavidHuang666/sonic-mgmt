@@ -1,9 +1,17 @@
 import pytest
 
-OPERATIONAL_SUFFIX = "_operational_range"
+from tests.transceiver.dom.utils.dom_constants import (
+    LANE_NUM_PLACEHOLDER,
+    OPERATIONAL_SUFFIX,
+)
+from tests.transceiver.dom.utils.dom_field_mapper import (
+    expand_operational_fields,
+    get_lane_count,
+)
 
 
 def test_dom_sensor_operational_range_validation(
+    dom_health_guard,
     dom_ports,
     dom_port_context,
     dom_sensor_by_port,
@@ -11,7 +19,20 @@ def test_dom_sensor_operational_range_validation(
     parse_dom_update_time,
     dom_now_utc,
 ):
-    """TC2: Validate configured operational ranges against DOM sensor readings."""
+    """TC2: Validate configured operational ranges against DOM sensor readings.
+
+    Args:
+        dom_health_guard: Explicit pre-test and post-test DOM health guard.
+        dom_ports: DOM-enabled ports selected for validation.
+        dom_port_context: Per-port DOM context with configured DOM attributes.
+        dom_sensor_by_port: Initial ``TRANSCEIVER_DOM_SENSOR`` data keyed by port.
+        parse_dom_numeric: Parser for numeric DOM values.
+        parse_dom_update_time: Parser for DOM ``last_update_time`` values.
+        dom_now_utc: Callable that returns the current UTC time.
+
+    Returns:
+        None.
+    """
     # Step 0: Initialize per-test aggregation and current DUT time source.
     all_failures = []
     has_configured_checks = False
@@ -47,7 +68,7 @@ def test_dom_sensor_operational_range_validation(
                         )
 
         # Step 3: Dynamically derive expected sensor fields from *_operational_range attributes.
-        lane_count = base_attrs.get("media_lane_count") or base_attrs.get("host_lane_count") or 0
+        lane_count = get_lane_count(base_attrs)
 
         for attr_name, attr_value in dom_attrs.items():
             if not attr_name.endswith(OPERATIONAL_SUFFIX) or not isinstance(attr_value, dict):
@@ -61,14 +82,10 @@ def test_dom_sensor_operational_range_validation(
                 field_failures.append("{} missing required min/max in DOM_ATTRIBUTES".format(attr_name))
                 continue
 
-            field_base = attr_name[: -len(OPERATIONAL_SUFFIX)]
-            if "LANE_NUM" in field_base:
-                if lane_count <= 0:
-                    field_failures.append("{} requires lane count but lane_count <= 0".format(attr_name))
-                    continue
-                fields = [field_base.replace("LANE_NUM", str(lane)) for lane in range(1, lane_count + 1)]
-            else:
-                fields = [field_base]
+            fields = expand_operational_fields(attr_name, lane_count)
+            if not fields and LANE_NUM_PLACEHOLDER in attr_name:
+                field_failures.append("{} requires lane count but lane_count <= 0".format(attr_name))
+                continue
 
             # Step 4: Validate each derived field is numeric and inside configured operational range.
             for field in fields:

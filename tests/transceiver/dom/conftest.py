@@ -1,254 +1,43 @@
-import logging
-import re
-import json
-import ast
 from datetime import datetime, timezone
 
 import pytest
 
-logger = logging.getLogger(__name__)
-
-DOM_CATEGORY_KEY = "DOM_ATTRIBUTES"
-STATE_DB_SENSOR_KEY_TEMPLATE = "TRANSCEIVER_DOM_SENSOR|{}"
-STATE_DB_THRESHOLD_KEY_TEMPLATE = "TRANSCEIVER_DOM_THRESHOLD|{}"
-
-OPERATIONAL_SUFFIX = "_operational_range"
-THRESHOLD_SUFFIX = "_threshold_range"
-LANE_NUM_PLACEHOLDER = "LANE_NUM"
-
-THRESHOLD_FIELD_SUFFIXES = ("lowalarm", "lowwarning", "highwarning", "highalarm")
-THRESHOLD_PREFIX_OVERRIDES = {
-    "temperature": "temp",
-    "voltage": "vcc",
-    "tx_power": "txpower",
-    "rx_power": "rxpower",
-    "tx_bias": "txbias",
-    "laser_temperature": "lasertemp",
-}
-
-CONSISTENCY_VARIATION_THRESHOLD_ATTRS = (
-    "tx_power_consistency_variation_threshold",
-    "rx_power_consistency_variation_threshold",
-    "tx_bias_consistency_variation_threshold",
-    "laser_temperature_consistency_variation_threshold",
-    "temperature_consistency_variation_threshold",
-    "voltage_consistency_variation_threshold",
+from tests.transceiver.dom.utils.dom_constants import (
+    CONSISTENCY_VARIATION_RULES,
+    DOM_CATEGORY_KEY,
+    STATE_DB_SENSOR_KEY_TEMPLATE,
+    STATE_DB_THRESHOLD_KEY_TEMPLATE,
 )
-
-# operational range attribute -> (threshold attribute, mode)
-# mode:
-# - abs: absolute delta check
-# - pct: percentage-of-previous-value delta check
-CONSISTENCY_VARIATION_RULES = {
-    "txLANE_NUMpower_operational_range": ("tx_power_consistency_variation_threshold", "abs"),
-    "rxLANE_NUMpower_operational_range": ("rx_power_consistency_variation_threshold", "abs"),
-    "txLANE_NUMbias_operational_range": ("tx_bias_consistency_variation_threshold", "pct"),
-    "laser_temperature_operational_range": ("laser_temperature_consistency_variation_threshold", "abs"),
-    "temperature_operational_range": ("temperature_consistency_variation_threshold", "abs"),
-    "voltage_operational_range": ("voltage_consistency_variation_threshold", "abs"),
-}
-
-_FLOAT_PATTERN = re.compile(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?")
-_PORT_SUFFIX_PATTERN = re.compile(r"^(.*?)(\d+)$")
-
-
-def _parse_hgetall_output(stdout_lines):
-    lines = [line.strip() for line in stdout_lines if str(line).strip()]
-    if not lines:
-        return {}
-
-    # Some platforms return HGETALL as a single serialized dict line.
-    if len(lines) == 1:
-        raw = lines[0]
-        if raw in ("{}", "[]"):
-            return {}
-
-        for parser in (json.loads, ast.literal_eval):
-            try:
-                parsed = parser(raw)
-            except Exception:
-                continue
-            if isinstance(parsed, dict):
-                return {str(k): str(v) for k, v in parsed.items()}
-
-    if len(lines) % 2 != 0:
-        logger.warning("Unexpected HGETALL output line count=%d lines=%s", len(lines), lines)
-        return {}
-
-    parsed = {}
-    for idx in range(0, len(lines), 2):
-        parsed[lines[idx]] = lines[idx + 1]
-    return parsed
-
-
-def _read_state_db_hash(duthost, key):
-    commands = [
-        'sonic-db-cli STATE_DB HGETALL "{}"'.format(key),
-        'redis-cli --raw -n 6 HGETALL "{}"'.format(key),
-    ]
-
-    for cmd in commands:
-        result = duthost.command(cmd, module_ignore_errors=True)
-        if result.get("rc", 1) != 0:
-            continue
-        parsed = _parse_hgetall_output(result.get("stdout_lines", []))
-        if parsed:
-            return parsed
-
-    return {}
-
-
-def _parse_numeric(value):
-    if value is None:
-        return None
-
-    text = str(value).strip()
-    if not text or text.upper() in ("N/A", "NA", "NONE"):
-        return None
-
-    match = _FLOAT_PATTERN.search(text)
-    if not match:
-        return None
-
-    try:
-        return float(match.group(0))
-    except ValueError:
-        return None
-
-
-def _parse_update_time(value):
-    if value is None:
-        return None
-
-    raw = str(value).strip()
-    if not raw:
-        return None
-
-    # Epoch seconds or milliseconds.
-    numeric = _parse_numeric(raw)
-    if numeric is not None and raw.replace(".", "", 1).isdigit():
-        epoch_sec = numeric / 1000.0 if numeric > 1e12 else numeric
-        try:
-            return datetime.fromtimestamp(epoch_sec, tz=timezone.utc)
-        except (OverflowError, OSError, ValueError):
-            pass
-
-    iso_text = raw.replace("Z", "+00:00")
-    try:
-        parsed = datetime.fromisoformat(iso_text)
-        if parsed.tzinfo is None:
-            parsed = parsed.replace(tzinfo=timezone.utc)
-        return parsed.astimezone(timezone.utc)
-    except ValueError:
-        pass
-
-    formats = (
-        "%Y-%m-%d %H:%M:%S",
-        "%Y-%m-%d %H:%M:%S.%f",
-        "%Y-%m-%dT%H:%M:%S",
-        "%Y-%m-%dT%H:%M:%S.%f",
-        "%a %b %d %H:%M:%S %Y",
-    )
-    for fmt in formats:
-        try:
-            return datetime.strptime(raw, fmt).replace(tzinfo=timezone.utc)
-        except ValueError:
-            continue
-
-    # Normalize repeated spaces (e.g., day-of-month formatting differences) and try again.
-    normalized = " ".join(raw.split())
-    if normalized != raw:
-        for fmt in formats:
-            try:
-                return datetime.strptime(normalized, fmt).replace(tzinfo=timezone.utc)
-            except ValueError:
-                continue
-
-    return None
-
-
-def _port_sort_key(port_name):
-    text = str(port_name)
-    match = _PORT_SUFFIX_PATTERN.match(text)
-    if not match:
-        return (text, -1, text)
-    return (match.group(1), int(match.group(2)), text)
-
-
-def _get_lane_count(base_attrs):
-    media_lane_count = base_attrs.get("media_lane_count")
-    if isinstance(media_lane_count, int) and media_lane_count > 0:
-        return media_lane_count
-
-    host_lane_count = base_attrs.get("host_lane_count")
-    if isinstance(host_lane_count, int) and host_lane_count > 0:
-        return host_lane_count
-
-    return 0
-
-
-def _expand_operational_fields(attr_name, lane_count):
-    base_name = attr_name[: -len(OPERATIONAL_SUFFIX)]
-    if LANE_NUM_PLACEHOLDER not in base_name:
-        return [base_name]
-
-    if lane_count <= 0:
-        return []
-
-    return [base_name.replace(LANE_NUM_PLACEHOLDER, str(lane)) for lane in range(1, lane_count + 1)]
-
-
-def _build_operational_field_range_map(dom_attrs, lane_count):
-    field_map = {}
-    for attr_name, attr_value in dom_attrs.items():
-        if not attr_name.endswith(OPERATIONAL_SUFFIX) or not isinstance(attr_value, dict):
-            continue
-        for field in _expand_operational_fields(attr_name, lane_count):
-            field_map[field] = {
-                "attr_name": attr_name,
-                "min": attr_value.get("min"),
-                "max": attr_value.get("max"),
-            }
-    return field_map
-
-
-def _threshold_field_map(attr_name):
-    if not attr_name.endswith(THRESHOLD_SUFFIX):
-        return {}
-
-    base_name = attr_name[: -len(THRESHOLD_SUFFIX)]
-    prefix = THRESHOLD_PREFIX_OVERRIDES.get(base_name, base_name.replace("_", ""))
-    return {suffix: "{}{}".format(prefix, suffix) for suffix in THRESHOLD_FIELD_SUFFIXES}
-
-
-def _parse_consistency_variation_thresholds(dom_attrs):
-    thresholds = {}
-    errors = []
-    for attr_name in CONSISTENCY_VARIATION_THRESHOLD_ATTRS:
-        raw_value = dom_attrs.get(attr_name)
-        if raw_value is None:
-            errors.append("missing required DOM attribute {} for consistency variation validation".format(attr_name))
-            continue
-
-        numeric = _parse_numeric(raw_value)
-        if numeric is None:
-            errors.append("{} is non-numeric in DOM_ATTRIBUTES (raw={!r})".format(attr_name, raw_value))
-            continue
-
-        if numeric < 0:
-            errors.append("{} must be >= 0, got {}".format(attr_name, numeric))
-            continue
-
-        thresholds[attr_name] = float(numeric)
-
-    return {
-        "thresholds": thresholds,
-        "errors": errors,
-    }
+from tests.transceiver.dom.utils.dom_field_mapper import (
+    build_operational_field_range_map,
+    get_lane_count,
+    parse_consistency_variation_thresholds,
+    port_sort_key,
+    threshold_field_map,
+)
+from tests.transceiver.dom.utils.dom_state_db_reader import (
+    parse_numeric,
+    parse_update_time,
+    read_state_db_hash,
+)
+from tests.transceiver.dom.utils.dom_health_check import (
+    build_dom_post_test_report,
+    collect_dom_health_snapshot,
+    validate_dom_post_test_cleanup,
+    validate_dom_pre_test_environment,
+)
 
 
 @pytest.fixture(scope="module")
 def dom_port_context(port_attributes_dict):
+    """Return per-port base and DOM attributes for ports with configured DOM data.
+
+    Args:
+        port_attributes_dict: Resolved transceiver attribute data keyed by port name.
+
+    Returns:
+        dict: Per-port context containing ``BASE_ATTRIBUTES`` and ``DOM_ATTRIBUTES``.
+    """
     context = {}
     for port, attrs in port_attributes_dict.items():
         dom_attrs = attrs.get(DOM_CATEGORY_KEY, {})
@@ -267,53 +56,98 @@ def dom_port_context(port_attributes_dict):
 
 @pytest.fixture(scope="module")
 def dom_ports(dom_port_context):
-    return sorted(dom_port_context.keys(), key=_port_sort_key)
+    """Return DOM-enabled port names in deterministic interface order.
+
+    Args:
+        dom_port_context: Per-port DOM context produced by ``dom_port_context``.
+
+    Returns:
+        list: DOM-enabled port names sorted with natural interface ordering.
+    """
+    return sorted(dom_port_context.keys(), key=port_sort_key)
 
 
 @pytest.fixture(scope="module")
 def dom_operational_fields_by_port(dom_port_context):
+    """Return expected operational STATE_DB sensor fields for each DOM port.
+
+    Args:
+        dom_port_context: Per-port DOM context produced by ``dom_port_context``.
+
+    Returns:
+        dict: Mapping from port name to sorted expected ``TRANSCEIVER_DOM_SENSOR`` fields.
+    """
     fields_by_port = {}
     for port, context in dom_port_context.items():
         dom_attrs = context["dom"]
-        lane_count = _get_lane_count(context["base"])
-        field_range_map = _build_operational_field_range_map(dom_attrs, lane_count)
+        lane_count = get_lane_count(context["base"])
+        field_range_map = build_operational_field_range_map(dom_attrs, lane_count)
         fields_by_port[port] = sorted(field_range_map.keys())
     return fields_by_port
 
 
 @pytest.fixture(scope="module")
 def dom_operational_ranges_by_port(dom_port_context):
+    """Return per-port operational range metadata keyed by STATE_DB sensor field.
+
+    Args:
+        dom_port_context: Per-port DOM context produced by ``dom_port_context``.
+
+    Returns:
+        dict: Mapping from port name to expected sensor fields and configured range metadata.
+    """
     ranges_by_port = {}
     for port, context in dom_port_context.items():
         dom_attrs = context["dom"]
-        lane_count = _get_lane_count(context["base"])
-        ranges_by_port[port] = _build_operational_field_range_map(dom_attrs, lane_count)
+        lane_count = get_lane_count(context["base"])
+        ranges_by_port[port] = build_operational_field_range_map(dom_attrs, lane_count)
     return ranges_by_port
 
 
 @pytest.fixture(scope="module")
 def dom_consistency_variation_rules():
+    """Return the configured operational-attribute to variation-threshold mapping.
+
+    Returns:
+        dict: Mapping from operational range attribute names to variation threshold rules.
+    """
     return dict(CONSISTENCY_VARIATION_RULES)
 
 
 @pytest.fixture(scope="module")
 def dom_consistency_variation_thresholds_by_port(dom_port_context):
+    """Return parsed consistency variation threshold metadata for each DOM port.
+
+    Args:
+        dom_port_context: Per-port DOM context produced by ``dom_port_context``.
+
+    Returns:
+        dict: Mapping from port name to parsed optional variation thresholds and parse errors.
+    """
     thresholds_by_port = {}
     for port, context in dom_port_context.items():
-        thresholds_by_port[port] = _parse_consistency_variation_thresholds(context["dom"])
+        thresholds_by_port[port] = parse_consistency_variation_thresholds(context["dom"])
     return thresholds_by_port
 
 
 @pytest.fixture(scope="module")
 def dom_threshold_fields_by_port(dom_port_context):
+    """Return threshold attribute to STATE_DB field mappings for each DOM port.
+
+    Args:
+        dom_port_context: Per-port DOM context produced by ``dom_port_context``.
+
+    Returns:
+        dict: Mapping from port name to threshold attribute and STATE_DB field mappings.
+    """
     fields_by_port = {}
     for port, context in dom_port_context.items():
         dom_attrs = context["dom"]
         attr_to_fields = {}
         for attr_name, attr_value in dom_attrs.items():
-            if not attr_name.endswith(THRESHOLD_SUFFIX) or not isinstance(attr_value, dict):
+            if not isinstance(attr_value, dict):
                 continue
-            field_map = _threshold_field_map(attr_name)
+            field_map = threshold_field_map(attr_name)
             if field_map:
                 attr_to_fields[attr_name] = field_map
         fields_by_port[port] = attr_to_fields
@@ -322,27 +156,69 @@ def dom_threshold_fields_by_port(dom_port_context):
 
 @pytest.fixture(scope="module")
 def dom_sensor_by_port(duthost, dom_ports):
+    """Read the TRANSCEIVER_DOM_SENSOR hash once for each DOM port.
+
+    Args:
+        duthost: DUT host fixture used to execute STATE_DB commands.
+        dom_ports: DOM-enabled ports selected for the module.
+
+    Returns:
+        dict: Mapping from port name to ``TRANSCEIVER_DOM_SENSOR`` hash contents.
+    """
     return {
-        port: _read_state_db_hash(duthost, STATE_DB_SENSOR_KEY_TEMPLATE.format(port))
+        port: read_state_db_hash(duthost, STATE_DB_SENSOR_KEY_TEMPLATE.format(port))
         for port in dom_ports
     }
 
 
 @pytest.fixture(scope="module")
 def dom_threshold_by_port(duthost, dom_ports):
+    """Read the TRANSCEIVER_DOM_THRESHOLD hash once for each DOM port.
+
+    Args:
+        duthost: DUT host fixture used to execute STATE_DB commands.
+        dom_ports: DOM-enabled ports selected for the module.
+
+    Returns:
+        dict: Mapping from port name to ``TRANSCEIVER_DOM_THRESHOLD`` hash contents.
+    """
     return {
-        port: _read_state_db_hash(duthost, STATE_DB_THRESHOLD_KEY_TEMPLATE.format(port))
+        port: read_state_db_hash(duthost, STATE_DB_THRESHOLD_KEY_TEMPLATE.format(port))
         for port in dom_ports
     }
 
 
 @pytest.fixture(scope="module")
 def dom_db_reader(duthost):
+    """Return callable STATE_DB readers for repeated DOM sensor and threshold reads.
+
+    Args:
+        duthost: DUT host fixture used to execute STATE_DB commands.
+
+    Returns:
+        dict: Callable readers keyed by ``sensor`` and ``threshold``.
+    """
     def _read_sensor(port):
-        return _read_state_db_hash(duthost, STATE_DB_SENSOR_KEY_TEMPLATE.format(port))
+        """Read current TRANSCEIVER_DOM_SENSOR data for one port.
+
+        Args:
+            port: Interface name whose DOM sensor data should be read.
+
+        Returns:
+            dict: Current ``TRANSCEIVER_DOM_SENSOR`` hash contents for the port.
+        """
+        return read_state_db_hash(duthost, STATE_DB_SENSOR_KEY_TEMPLATE.format(port))
 
     def _read_threshold(port):
-        return _read_state_db_hash(duthost, STATE_DB_THRESHOLD_KEY_TEMPLATE.format(port))
+        """Read current TRANSCEIVER_DOM_THRESHOLD data for one port.
+
+        Args:
+            port: Interface name whose DOM threshold data should be read.
+
+        Returns:
+            dict: Current ``TRANSCEIVER_DOM_THRESHOLD`` hash contents for the port.
+        """
+        return read_state_db_hash(duthost, STATE_DB_THRESHOLD_KEY_TEMPLATE.format(port))
 
     return {
         "sensor": _read_sensor,
@@ -352,17 +228,40 @@ def dom_db_reader(duthost):
 
 @pytest.fixture(scope="module")
 def parse_dom_numeric():
-    return _parse_numeric
+    """Return the shared DOM numeric parser.
+
+    Returns:
+        callable: Parser that extracts a floating-point value from DOM text.
+    """
+    return parse_numeric
 
 
 @pytest.fixture(scope="module")
 def parse_dom_update_time():
-    return _parse_update_time
+    """Return the shared DOM last_update_time parser.
+
+    Returns:
+        callable: Parser that converts DOM update timestamps to UTC datetimes.
+    """
+    return parse_update_time
 
 
 @pytest.fixture(scope="module")
 def dom_now_utc(duthost):
+    """Return a callable UTC clock based on DUT time with local fallback.
+
+    Args:
+        duthost: DUT host fixture used to read device time.
+
+    Returns:
+        callable: Function returning the current UTC datetime.
+    """
     def _now():
+        """Return the current UTC time, preferring the DUT clock.
+
+        Returns:
+            datetime: Current UTC timestamp from the DUT, or local UTC time as fallback.
+        """
         result = duthost.command("date +%s", module_ignore_errors=True)
         if result.get("rc", 1) == 0:
             text = result.get("stdout", "").strip()
@@ -370,3 +269,112 @@ def dom_now_utc(duthost):
                 return datetime.fromtimestamp(int(text), tz=timezone.utc)
         return datetime.now(tz=timezone.utc)
     return _now
+
+
+@pytest.fixture(scope="module")
+def dom_health_baseline(duthost):
+    """Capture the DOM health baseline before optional health guard checks.
+
+    Args:
+        duthost: DUT host fixture used to collect health baseline data.
+
+    Returns:
+        dict: Baseline core-file, syslog cursor, and xcvrd status data.
+    """
+    return collect_dom_health_snapshot(duthost)
+
+
+@pytest.fixture(scope="module")
+def dom_health_checker(duthost, dom_ports, dom_port_context, dom_health_baseline):
+    """Return callable DOM health precheck, postcheck, and report helpers.
+
+    Args:
+        duthost: DUT host fixture used to run health checks.
+        dom_ports: DOM-enabled ports selected for the module.
+        dom_port_context: Per-port DOM context produced by ``dom_port_context``.
+        dom_health_baseline: Baseline health snapshot captured before checks.
+
+    Returns:
+        dict: Health helper callables keyed by ``precheck``, ``postcheck``, and ``report``.
+    """
+    def _precheck(check_logs=True, check_lldp=True):
+        """Run DOM pre-test system health and transceiver baseline checks.
+
+        Args:
+            check_logs: Whether to scan existing syslog DOM errors.
+            check_lldp: Whether to validate LLDP neighbors when LLDP is enabled.
+
+        Returns:
+            dict: Pre-test validation errors and details.
+        """
+        return validate_dom_pre_test_environment(
+            duthost,
+            dom_ports,
+            check_logs=check_logs,
+            check_lldp=check_lldp,
+        )
+
+    def _postcheck(check_logs=True):
+        """Run DOM post-test monitoring, service, core-file, and log checks.
+
+        Args:
+            check_logs: Whether to scan syslog errors introduced after the baseline.
+
+        Returns:
+            dict: Post-test cleanup validation errors and details.
+        """
+        return validate_dom_post_test_cleanup(
+            duthost,
+            dom_port_context,
+            baseline=dom_health_baseline,
+            check_logs=check_logs,
+        )
+
+    def _report(precheck_result=None, cleanup_result=None):
+        """Build a compact summary from optional precheck and cleanup results.
+
+        Args:
+            precheck_result: Optional pre-test validation result.
+            cleanup_result: Optional post-test cleanup validation result.
+
+        Returns:
+            dict: Summary report containing pass/fail state, counts, errors, and details.
+        """
+        return build_dom_post_test_report(precheck_result=precheck_result, cleanup_result=cleanup_result)
+
+    return {
+        "baseline": dom_health_baseline,
+        "precheck": _precheck,
+        "postcheck": _postcheck,
+        "report": _report,
+    }
+
+
+@pytest.fixture(scope="module")
+def dom_health_guard(dom_health_checker):
+    """Fail a module when explicit DOM health precheck or postcheck guards fail.
+
+    Args:
+        dom_health_checker: Health helper fixture with precheck, postcheck, and report callables.
+
+    Yields:
+        dict: Pre-test health validation result for tests that opt into this guard.
+    """
+    precheck_result = dom_health_checker["precheck"]()
+    if precheck_result["errors"]:
+        pytest.fail("DOM pre-test health check failures:\n" + "\n".join(precheck_result["errors"]))
+
+    yield precheck_result
+
+    cleanup_result = dom_health_checker["postcheck"]()
+    if cleanup_result["errors"]:
+        report = dom_health_checker["report"](
+            precheck_result=precheck_result,
+            cleanup_result=cleanup_result,
+        )
+        pytest.fail(
+            "DOM post-test cleanup/health failures:\n{}\nReport: {}".format(
+                "\n".join(cleanup_result["errors"]),
+                report,
+            )
+        )

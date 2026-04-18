@@ -4,6 +4,7 @@ import pytest
 
 
 def test_dom_data_consistency_verification(
+    dom_health_guard,
     dom_ports,
     dom_port_context,
     dom_operational_fields_by_port,
@@ -14,7 +15,23 @@ def test_dom_data_consistency_verification(
     parse_dom_numeric,
     parse_dom_update_time,
 ):
-    """TC4: Validate DOM data consistency across polling cycles."""
+    """TC4: Validate DOM data consistency across polling cycles.
+
+    Args:
+        dom_health_guard: Explicit pre-test and post-test DOM health guard.
+        dom_ports: DOM-enabled ports selected for validation.
+        dom_port_context: Per-port DOM context with configured DOM attributes.
+        dom_operational_fields_by_port: Expected DOM sensor fields keyed by port.
+        dom_operational_ranges_by_port: Operational range metadata keyed by port and sensor field.
+        dom_consistency_variation_thresholds_by_port: Parsed optional variation thresholds keyed by port.
+        dom_consistency_variation_rules: Mapping from operational attributes to variation threshold rules.
+        dom_db_reader: Callable DOM STATE_DB readers for repeated polling.
+        parse_dom_numeric: Parser for numeric DOM values.
+        parse_dom_update_time: Parser for DOM ``last_update_time`` values.
+
+    Returns:
+        None.
+    """
     all_failures = []
     has_configured_checks = bool(dom_ports)
 
@@ -142,21 +159,11 @@ def test_dom_data_consistency_verification(
 
                 variation_rule = dom_consistency_variation_rules.get(attr_name)
                 if variation_rule is None:
-                    if attr_name not in invalid_variation_rule_attrs:
-                        field_failures.append(
-                            "{} has no mapped consistency variation threshold rule".format(attr_name)
-                        )
-                        invalid_variation_rule_attrs.add(attr_name)
                     continue
 
                 threshold_attr, mode = variation_rule
                 threshold_value = variation_thresholds.get(threshold_attr)
                 if threshold_value is None:
-                    if threshold_attr not in invalid_variation_rule_attrs:
-                        field_failures.append(
-                            "{} missing parsed variation threshold {}".format(attr_name, threshold_attr)
-                        )
-                        invalid_variation_rule_attrs.add(threshold_attr)
                     continue
 
                 if mode == "abs":

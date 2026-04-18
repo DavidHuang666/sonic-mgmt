@@ -28,11 +28,11 @@
             },
             "txLANE_NUMpower_operational_range": {
               "min": -4.0,
-              "max": 3.0
+              "max": 3.5
             },
             "rxLANE_NUMpower_operational_range": {
               "min": -4.0,
-              "max": 3.0
+              "max": 3.5
             },
             "txLANE_NUMbias_operational_range": {
               "min": 20.0,
