@@ -1,49 +1,35 @@
 import pytest
 
-THRESHOLD_SUFFIX = "_threshold_range"
-VALUE_TOLERANCE = 0.01
-
-
-# Map attribute naming to STATE_DB threshold key prefixes.
-THRESHOLD_PREFIX_OVERRIDES = {
-    "temperature": "temp",
-    "voltage": "vcc",
-    "tx_power": "txpower",
-    "rx_power": "rxpower",
-    "tx_bias": "txbias",
-    "laser_temperature": "lasertemp",
-}
-
-
-EXPECTED_THRESHOLD_KEYS = ("lowalarm", "lowwarning", "highwarning", "highalarm")
-
-# Threshold attribute base -> related operational range attribute(s).
-# Some threshold attributes map to lane-based operational attributes.
-THRESHOLD_TO_OPERATIONAL_ATTR_CANDIDATES = {
-    "tx_bias": ("txLANE_NUMbias_operational_range", "tx_bias_operational_range"),
-    "tx_power": ("txLANE_NUMpower_operational_range", "tx_power_operational_range"),
-    "rx_power": ("rxLANE_NUMpower_operational_range", "rx_power_operational_range"),
-}
-
-
-def _build_threshold_field_map(attr_name):
-    base_name = attr_name[: -len(THRESHOLD_SUFFIX)]
-    prefix = THRESHOLD_PREFIX_OVERRIDES.get(base_name, base_name.replace("_", ""))
-    return {key: "{}{}".format(prefix, key) for key in EXPECTED_THRESHOLD_KEYS}
-
-
-def _operational_attr_candidates(base_name):
-    default = ("{}_operational_range".format(base_name),)
-    return THRESHOLD_TO_OPERATIONAL_ATTR_CANDIDATES.get(base_name, default)
+from tests.transceiver.dom.utils.dom_constants import (
+    THRESHOLD_FIELD_SUFFIXES,
+    THRESHOLD_SUFFIX,
+    VALUE_TOLERANCE,
+)
+from tests.transceiver.dom.utils.dom_field_mapper import (
+    build_threshold_field_map,
+    operational_attr_candidates,
+)
 
 
 def test_dom_threshold_validation(
+    dom_health_guard,
     dom_ports,
     dom_port_context,
     dom_threshold_by_port,
     parse_dom_numeric,
 ):
-    """TC3: Validate threshold values, hierarchy, and operational-vs-threshold relationship."""
+    """TC3: Validate threshold values, hierarchy, and operational-vs-threshold relationship.
+
+    Args:
+        dom_health_guard: Explicit pre-test and post-test DOM health guard.
+        dom_ports: DOM-enabled ports selected for validation.
+        dom_port_context: Per-port DOM context with configured DOM attributes.
+        dom_threshold_by_port: Initial ``TRANSCEIVER_DOM_THRESHOLD`` data keyed by port.
+        parse_dom_numeric: Parser for numeric DOM threshold values.
+
+    Returns:
+        None.
+    """
     # Step 0: Initialize per-test aggregation.
     all_failures = []
     has_configured_checks = False
@@ -61,10 +47,10 @@ def test_dom_threshold_validation(
             has_configured_checks = True
 
             # Step 2: Validate threshold attribute completeness in configuration.
-            if not all(key in attr_value for key in EXPECTED_THRESHOLD_KEYS):
+            if not all(key in attr_value for key in THRESHOLD_FIELD_SUFFIXES):
                 field_failures.append(
                     "{} missing required keys {}; cannot validate threshold range".format(
-                        attr_name, EXPECTED_THRESHOLD_KEYS
+                        attr_name, THRESHOLD_FIELD_SUFFIXES
                     )
                 )
                 continue
@@ -74,7 +60,7 @@ def test_dom_threshold_validation(
                 field_failures.append("{} threshold table missing in STATE_DB".format(attr_name))
                 continue
 
-            field_map = _build_threshold_field_map(attr_name)
+            field_map = build_threshold_field_map(attr_name)
             parsed_actual = {}
             parse_failed = False
             for logical_key, db_field in field_map.items():
@@ -91,7 +77,7 @@ def test_dom_threshold_validation(
                 continue
 
             # Step 4: Compare configured threshold values against STATE_DB values.
-            for logical_key in EXPECTED_THRESHOLD_KEYS:
+            for logical_key in THRESHOLD_FIELD_SUFFIXES:
                 expected = float(attr_value[logical_key])
                 actual = parsed_actual[logical_key]
                 if abs(actual - expected) > VALUE_TOLERANCE:
@@ -112,7 +98,7 @@ def test_dom_threshold_validation(
 
             # Step 6: Validate operational range is inside warning window when both are configured.
             base_name = attr_name[: -len(THRESHOLD_SUFFIX)]
-            for operational_attr in _operational_attr_candidates(base_name):
+            for operational_attr in operational_attr_candidates(base_name):
                 operational_range = dom_attrs.get(operational_attr)
                 if not isinstance(operational_range, dict):
                     continue

@@ -3,6 +3,7 @@ import pytest
 
 def test_dom_data_availability_verification(
     duthost,
+    dom_health_guard,
     dom_ports,
     dom_port_context,
     dom_sensor_by_port,
@@ -10,7 +11,21 @@ def test_dom_data_availability_verification(
     parse_dom_update_time,
     dom_now_utc,
 ):
-    """Verify DOM readability and freshness via STATE_DB in a configuration-driven manner."""
+    """Verify DOM readability and freshness via STATE_DB in a configuration-driven manner.
+
+    Args:
+        duthost: DUT host fixture.
+        dom_health_guard: Explicit pre-test and post-test DOM health guard.
+        dom_ports: DOM-enabled ports selected for validation.
+        dom_port_context: Per-port DOM context with configured DOM attributes.
+        dom_sensor_by_port: Initial ``TRANSCEIVER_DOM_SENSOR`` data keyed by port.
+        dom_operational_fields_by_port: Expected DOM sensor fields keyed by port.
+        parse_dom_update_time: Parser for DOM ``last_update_time`` values.
+        dom_now_utc: Callable that returns the current UTC time.
+
+    Returns:
+        None.
+    """
     # Step 0: Skip unsupported virtual-switch environment.
     if duthost.facts.get("asic_type") == "vs":
         pytest.skip("Skipping DOM verification on virtual switch testbed")
