@@ -79,14 +79,19 @@ of the transceiver DOM test framework.
 - For attributes configured in `dom.json`, required mapped STATE_DB fields must exist and be parseable for the corresponding test case; missing/non-parseable values are failures.
 - TC4 consistency variation thresholds are optional per `dom_test_plan.md`; absent threshold attributes skip only the corresponding variation-delta check, while configured invalid threshold values still fail.
 - DOM health checks map to `dom_test_plan.md` environment validation and cleanup sections. TC1-TC4 include the explicit `dom_health_guard` fixture rather than using an autouse fixture, so health validation runs for the selected basic DOM test cases while collection remains controlled by the selected test module and testbed arguments.
+- DOM LLDP health validation now uses `duthost.show_and_parse("show lldp table")` and exact `localport` matching, so health prechecks avoid substring false positives such as `Ethernet1` matching `Ethernet10`; the helper reports parsed `observed_ports` instead of raw CLI `stdout`.
 - DOM health Docker checks parse `docker ps --no-trunc` and `docker inspect` JSON output instead of Docker Go-template output, avoiding Ansible/Jinja conflicts with `{{...}}` format strings.
 - DOM health syslog scanning applies broad DOM component matching first, then only treats WARN/ERROR-level records as failures and ignores Ansible command invocation echoes to avoid self-generated log matches.
+- DOM health helpers now parse `supervisorctl status xcvrd` state tokens and `sfputil show presence -p <port>` single-port results explicitly instead of relying on broad `stdout` substring matches.
 - STATE_DB access uses `sonic-db-cli STATE_DB HGETALL`, with `redis-cli --raw -n 6` fallback.
+- DOM STATE_DB hash reads now support multi-ASIC DUTs by trying `sonic-db-cli -n <frontend-asic-namespace> STATE_DB HGETALL ...` before falling back to the default namespace and raw `redis-cli`, while keeping the existing `read_state_db_hash(duthost, key)` call sites unchanged.
+- DOM polling-state checks now support multi-ASIC DUTs by trying `sonic-db-cli -n <frontend-asic-namespace> CONFIG_DB HGET "PORT|<port>" "dom_polling"` before falling back to the default namespace; health details now include the namespace that produced the resolved value.
 - `conftest.py` now contains fixtures only; shared constants, field mapping, parsers, STATE_DB readers, and health-check guards live under `tests/transceiver/dom/utils/`.
 - DOM failure reporting style now follows EEPROM aggregation style: grouped by port with indented per-field/per-check failure details.
 - DOM tests now use EEPROM-like result control flow: `field_failures`/`all_failures` + `has_configured_checks`, without per-port/pass counters such as `port_validated` or `validated_ports`.
 - DOM test files include explicit step comments to align code blocks with the corresponding test-plan execution steps.
 - Basic DOM TC1-TC4 test files do not declare explicit topology markers; topology selection is left to the shared pytest/testbed infrastructure.
+- TC4 DOM consistency polling now batches ports by `(consistency_check_poll_count, max_update_time_sec)` and sleeps once per poll group instead of once per port, preserving per-port attribute-driven polling settings while reducing runtime on multi-port devices.
 
 ## EEPROM Bring-Up Notes
 - Inventory files updated for Accelight OSFP module bring-up:
