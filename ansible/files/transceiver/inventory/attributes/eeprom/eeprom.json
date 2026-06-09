@@ -1,0 +1,10 @@
+{
+  "mandatory": [
+    "dual_bank_supported"
+  ],
+  "defaults": {
+    "vdm_supported": false,
+    "is_non_dac_and_cmis": true,
+    "eeprom_dump_timeout_sec": 5
+  }
+}

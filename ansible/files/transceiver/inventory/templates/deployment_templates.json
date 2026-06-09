@@ -1,14 +1,41 @@
 {
   "deployment_templates": {
-    "2x100G_200G_SIDE": {
+    "400G_STRAIGHT": {
       "required_attributes": {
-        "BASE_ATTRIBUTES": ["vendor_name", "vendor_pn", "cable_type", "speed_gbps", "deployment"],
-        "EEPROM_ATTRIBUTES": ["dual_bank_supported", "vdm_supported"],
-        "DOM_ATTRIBUTES": ["temperature", "voltage", "tx_power", "alarm_flags"]
+        "BASE_ATTRIBUTES": [
+          "vendor_name",
+          "vendor_pn",
+          "cable_type",
+          "speed_gbps",
+          "deployment",
+          "media_lane_count",
+          "host_lane_count"
+        ],
+        "DOM_ATTRIBUTES": [
+          "data_max_age_min",
+          "max_update_time_sec",
+          "consistency_check_poll_count",
+          "temperature_operational_range",
+          "voltage_operational_range",
+          "txLANE_NUMpower_operational_range",
+          "rxLANE_NUMpower_operational_range",
+          "txLANE_NUMbias_operational_range",
+          "temperature_threshold_range",
+          "voltage_threshold_range",
+          "rx_power_threshold_range",
+          "tx_power_threshold_range",
+          "tx_bias_threshold_range"
+        ]
       },
       "optional_attributes": {
-        "BASE_ATTRIBUTES": ["hardware_rev", "vendor_rev"],
-        "CDB_FW_ATTRIBUTES": ["firmware_upgrade_support"]
+        "DOM_ATTRIBUTES": [
+          "tx_power_consistency_variation_threshold",
+          "rx_power_consistency_variation_threshold",
+          "tx_bias_consistency_variation_threshold",
+          "laser_temperature_consistency_variation_threshold",
+          "temperature_consistency_variation_threshold",
+          "voltage_consistency_variation_threshold"
+        ]
       }
     }
   }

@@ -32,7 +32,7 @@ DOM tests are configuration-driven and rely on:
 - DUT-specific inventory data
 - Attribute normalization and prerequisite checks
 
-Existing infra modules under tests/transceiver/infra/ provide:
+Existing attribute parser modules under tests/transceiver/attribute_parser/ provide:
 - attribute parsing
 - configuration loading
 - validation helpers

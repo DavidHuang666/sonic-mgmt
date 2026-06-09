@@ -38,7 +38,7 @@ If implementation conflicts with diagrams, diagrams win.
 - Tests should not perform raw parsing logic
 
 ## 7. Reuse Over Reinvention
-- Prefer existing utilities in tests/transceiver/infra/
+- Prefer existing utilities in tests/transceiver/attribute_parser/
 - Do not duplicate attribute parsing or validation logic
 
 ## 8. Verification Is Mandatory
