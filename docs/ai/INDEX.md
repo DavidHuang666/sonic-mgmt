@@ -74,7 +74,7 @@ of the transceiver DOM test framework.
 - `tests/transceiver/dom/test_dom_threshold.py`
   - TC3: threshold comparison, completeness, hierarchy validation, operational-vs-warning boundary checks; success logs include per-port checked threshold attribute names.
 - `tests/transceiver/dom/test_dom_consistency.py`
-  - TC4: polling-based consistency checks with timestamp progression and threshold-driven variation validation using flat consistency threshold attributes (`tx/rx power`, `tx bias`, `laser/module temperature`, `voltage`); absent `consistency_check_poll_count` and `max_update_time_sec` use `dom_test_plan.md` defaults of `3` and `60`.
+  - TC4: polling-based consistency checks with timestamp progression and threshold-driven variation validation using flat consistency threshold attributes (`tx/rx power`, `tx bias`, `laser/module temperature`, `voltage`); absent `consistency_check_poll_count` and `max_update_time_sec` use `dom_test_plan.md` defaults of `3` and `60`; long polling waits log per-group wait/completion progress.
 - `tests/transceiver/dom/advanced/test_dom_interface_state.py`
   - Advanced TC1 skeleton (currently explicit skip).
 - `tests/transceiver/dom/advanced/test_dom_polling.py`
