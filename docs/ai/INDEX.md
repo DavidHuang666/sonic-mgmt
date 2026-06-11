@@ -57,7 +57,7 @@ of the transceiver DOM test framework.
 - `dom_threshold_fields_by_port`: Builds threshold key mappings for `TRANSCEIVER_DOM_THRESHOLD`.
 - `dom_sensor_by_port` / `dom_threshold_by_port`: Bulk reads from STATE_DB hash tables.
 - `dom_db_reader`: Callable fixture for repeated sensor/threshold reads during polling tests.
-- `dom_per_test_snapshots`: Autouse per-test fixture that records interface status and DOM sensor snapshots before and after each DOM test, then dispatches link liveness, optional link-stability marker, and data-freshness checks through the shared health-check framework.
+- `dom_per_test_snapshots`: Autouse per-test fixture that records interface status and DOM sensor snapshots before and after each DOM test, logs per-check link liveness/stability and freshness PASS/FAIL details, then dispatches the checks through the shared health-check framework.
 - `parse_dom_numeric` / `parse_dom_update_time`: Robust parsers for numeric fields and `last_update_time`.
 - `dom_now_utc`: DUT-time based UTC clock source for freshness checks.
 - DOM parser compatibility: supports both standard HGETALL key/value line output and single-line serialized dict output from platform wrappers.
@@ -105,7 +105,7 @@ of the transceiver DOM test framework.
 - For attributes configured in DOM shards, required mapped STATE_DB fields must exist and be parseable for the corresponding test case; missing/non-parseable values are failures.
 - Local data-flow validation was run with `DutInfoLoader -> AttributeManager -> TemplateValidator` for DUT `str-nexthop_4010-01`; `Ethernet0` and `Ethernet8` produced `DOM_ATTRIBUTES` and both ports were fully compliant with the `400G_STRAIGHT` template.
 - TC4 consistency variation thresholds are optional per `dom_test_plan.md`; absent threshold attributes use default limits, while configured invalid threshold values still fail.
-- DOM per-test setup now captures interface status before each test and checks admin/oper liveness before and after the test. If the platform exposes a comparable `flap_count`/`last_change` style marker in interface status output, the post-test check verifies it did not advance.
+- DOM per-test setup now captures interface status before each test and checks admin/oper liveness before and after the test. The liveness and optional post-test stability checks are logged with per-port PASS/FAIL details before being submitted to the shared health-check framework. If the platform exposes a comparable `flap_count`/`last_change` style marker in interface status output, the post-test check verifies it did not advance.
 - STATE_DB access uses `sonic-db-cli STATE_DB HGETALL`, with `redis-cli --raw -n 6` fallback.
 - DB hash reads support multi-ASIC DUTs by trying `sonic-db-cli -n <frontend-asic-namespace> <DB> HGETALL ...` before falling back to the default namespace.
 - DOM polling-state checks read CONFIG_DB `PORT|<port>` through the DOM `read_config_db_hash` helper; missing `dom_polling` is treated as default-enabled, `enabled` passes, `disabled` skips the DOM session prerequisite, and unexpected values skip with a clear diagnostic.
