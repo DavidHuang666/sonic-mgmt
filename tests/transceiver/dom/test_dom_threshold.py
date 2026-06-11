@@ -32,6 +32,7 @@ def test_dom_threshold_validation(
     all_failures = []
     has_configured_checks = False
     checked_attrs_by_port = {}
+    checked_attr_names_by_port = {}
     checked_fields_by_port = {}
 
     for port in dom_ports:
@@ -41,6 +42,7 @@ def test_dom_threshold_validation(
         threshold_data = dom_threshold_by_port.get(port, {})
         field_failures = []
         checked_attrs = 0
+        checked_attr_names = []
         checked_fields = 0
 
         for attr_name, attr_value in dom_attrs.items():
@@ -146,11 +148,13 @@ def test_dom_threshold_validation(
 
             if len(field_failures) == attr_failure_count:
                 checked_attrs += 1
+                checked_attr_names.append(attr_name)
                 checked_fields += len(field_map)
 
         if field_failures:
             all_failures.append("{}:\n  {}".format(port, "\n  ".join(field_failures)))
         checked_attrs_by_port[port] = checked_attrs
+        checked_attr_names_by_port[port] = checked_attr_names
         checked_fields_by_port[port] = checked_fields
 
     # Step 7: Final decision for skip/fail.
@@ -170,8 +174,9 @@ def test_dom_threshold_validation(
     )
     for port in sorted(checked_attrs_by_port):
         logger.info(
-            "DOM threshold validation %s: checked %d threshold attribute(s), %d threshold field(s)",
+            "DOM threshold validation %s: checked %d threshold attribute(s), %d threshold field(s): %s",
             port,
             checked_attrs_by_port[port],
             checked_fields_by_port[port],
+            ", ".join(sorted(checked_attr_names_by_port.get(port, []))) or "none",
         )

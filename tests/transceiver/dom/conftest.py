@@ -1019,22 +1019,24 @@ def _log_dom_freshness_checks(phase, checks):
         log_fn("DOM %s freshness %s %s: %s", phase, "PASS" if passed else "FAIL", name, detail)
 
 
-def _log_dom_link_checks(phase, checks):
+def _log_dom_link_checks(phase, checks, check_label="link"):
     """Log DOM interface liveness and stability check results.
 
     Args:
         phase: Human-readable phase name, such as ``"pre-test"``.
         checks: ``(name, passed, detail)`` tuples built by DOM link helpers.
+        check_label: Human-readable check category, such as ``"link"`` or
+            ``"link stability"``.
     """
     if not checks:
-        logger.info("DOM %s link checks skipped: no comparable interface status fields", phase)
+        logger.info("DOM %s %s checks skipped: no comparable interface status fields", phase, check_label)
         return
 
     passed_count = sum(1 for _name, passed, _detail in checks if passed)
-    logger.info("DOM %s link checks passed: %d/%d", phase, passed_count, len(checks))
+    logger.info("DOM %s %s checks passed: %d/%d", phase, check_label, passed_count, len(checks))
     for name, passed, detail in checks:
         log_fn = logger.info if passed else logger.warning
-        log_fn("DOM %s link %s %s: %s", phase, "PASS" if passed else "FAIL", name, detail)
+        log_fn("DOM %s %s %s %s: %s", phase, check_label, "PASS" if passed else "FAIL", name, detail)
 
 
 def _log_dom_interface_status(phase, status_by_port):
@@ -1120,7 +1122,7 @@ def dom_per_test_snapshots(
         snapshots["post"]["captured_at"],
     )
     _log_dom_link_checks("post-test", post_link_checks)
-    _log_dom_link_checks("post-test stability", post_stability_checks)
+    _log_dom_link_checks("post-test", post_stability_checks, check_label="link stability")
     _log_dom_freshness_checks("post-test", post_freshness_checks)
     run_post_check(
         request,

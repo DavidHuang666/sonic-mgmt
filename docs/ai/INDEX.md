@@ -72,7 +72,7 @@ of the transceiver DOM test framework.
 - `tests/transceiver/dom/test_dom_operational_range.py`
   - TC2: `test_dom_sensor_operational_range_validation` validates freshness (`last_update_time`) and operational ranges for configured attributes only; configured field missing/non-numeric fails.
 - `tests/transceiver/dom/test_dom_threshold.py`
-  - TC3: threshold comparison, completeness, hierarchy validation, operational-vs-warning boundary checks.
+  - TC3: threshold comparison, completeness, hierarchy validation, operational-vs-warning boundary checks; success logs include per-port checked threshold attribute names.
 - `tests/transceiver/dom/test_dom_consistency.py`
   - TC4: polling-based consistency checks with timestamp progression and threshold-driven variation validation using flat consistency threshold attributes (`tx/rx power`, `tx bias`, `laser/module temperature`, `voltage`); absent `consistency_check_poll_count` and `max_update_time_sec` use `dom_test_plan.md` defaults of `3` and `60`.
 - `tests/transceiver/dom/advanced/test_dom_interface_state.py`
