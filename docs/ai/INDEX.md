@@ -115,6 +115,7 @@ of the transceiver DOM test framework.
 - DOM test files include explicit step comments to align code blocks with the corresponding test-plan execution steps.
 - Basic DOM TC1-TC4 test files do not declare explicit topology markers; topology selection is left to the shared pytest/testbed infrastructure.
 - TC4 DOM consistency polling now batches ports by `(consistency_check_poll_count, max_update_time_sec)` and sleeps once per poll group instead of once per port, preserving per-port attribute-driven polling settings while reducing runtime on multi-port devices.
+- TC2 operational range PASS debug logging uses standard logging `%s` placeholders only; mixing `{}` placeholders with logging arguments can raise `TypeError` during pytest log formatting and falsely fail an otherwise passing range check.
 
 ## EEPROM Bring-Up Notes
 - Inventory files updated for Accelight OSFP module bring-up:
