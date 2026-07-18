@@ -6,25 +6,11 @@ def test_dom_data_availability_verification(
     dom_ports,
     dom_port_context,
     dom_sensor_by_port,
-    dom_operational_fields_by_port,
+    dom_availability_plan_by_port,
     parse_dom_update_time,
     dom_now_utc,
 ):
-    """Verify DOM readability and freshness via STATE_DB in a configuration-driven manner.
-
-    Args:
-        duthost: DUT host fixture.
-        dom_ports: DOM-enabled ports selected for validation.
-        dom_port_context: Per-port DOM context with configured DOM attributes.
-        dom_sensor_by_port: Per-test baseline ``TRANSCEIVER_DOM_SENSOR`` data keyed by port.
-        dom_operational_fields_by_port: Expected DOM sensor fields keyed by port.
-        parse_dom_update_time: Parser for DOM ``last_update_time`` values.
-        dom_now_utc: Callable that returns the current UTC time.
-
-    Returns:
-        None.
-    """
-    # Step 0: Skip unsupported virtual-switch environment.
+    """Verify configured DOM sensor data is present and fresh in STATE_DB."""
     if duthost.facts.get("asic_type") == "vs":
         pytest.skip("Skipping DOM verification on virtual switch testbed")
 
@@ -33,50 +19,61 @@ def test_dom_data_availability_verification(
     now_utc = dom_now_utc()
 
     for port in dom_ports:
-        # Step 1: Build expected checks for this port from resolved DOM attributes.
-        sensor_data = dom_sensor_by_port.get(port, {})
         dom_attrs = dom_port_context[port]["dom"]
-        expected_fields = dom_operational_fields_by_port.get(port, [])
-        field_failures = []
-
-        # last_update_time freshness is config-driven and optional.
+        sensor_data = dom_sensor_by_port.get(port, {})
+        availability_plan = dom_availability_plan_by_port.get(port, {})
+        expected_fields = availability_plan.get("expected_fields", [])
+        field_failures = list(availability_plan.get("errors", []))
         max_age_min = dom_attrs.get("data_max_age_min")
-        if max_age_min is not None:
-            has_configured_checks = True
-        if expected_fields:
+
+        if max_age_min is not None or expected_fields or field_failures:
             has_configured_checks = True
 
-        # Step 2: Validate STATE_DB table existence when checks are configured.
         if not sensor_data:
             if max_age_min is not None:
-                field_failures.append("missing TRANSCEIVER_DOM_SENSOR data for freshness check")
+                field_failures.append(
+                    "missing TRANSCEIVER_DOM_SENSOR data for last_update_time freshness check"
+                )
             for field in expected_fields:
-                field_failures.append("missing TRANSCEIVER_DOM_SENSOR data for expected field {}".format(field))
+                field_failures.append(
+                    "missing TRANSCEIVER_DOM_SENSOR data for expected field {}".format(field)
+                )
             if field_failures:
                 all_failures.append("{}:\n  {}".format(port, "\n  ".join(field_failures)))
             continue
 
-        # Step 3: Validate timestamp freshness when data_max_age_min is configured.
         if max_age_min is not None:
-            parsed_time = parse_dom_update_time(sensor_data.get("last_update_time"))
-            if parsed_time is None:
-                field_failures.append("last_update_time missing or unparsable while data_max_age_min is configured")
+            try:
+                max_age = float(max_age_min)
+            except (TypeError, ValueError):
+                field_failures.append(
+                    "invalid data_max_age_min={!r} in DOM_ATTRIBUTES".format(max_age_min)
+                )
             else:
-                age_minutes = (now_utc - parsed_time).total_seconds() / 60.0
-                if age_minutes > float(max_age_min):
+                parsed_time = parse_dom_update_time(sensor_data.get("last_update_time"))
+                if parsed_time is None:
                     field_failures.append(
-                        "last_update_time too old (age_min={:.2f}, limit={})".format(age_minutes, max_age_min)
+                        "last_update_time missing or unparsable while data_max_age_min is configured"
                     )
+                else:
+                    age_minutes = (now_utc - parsed_time).total_seconds() / 60.0
+                    if age_minutes > max_age:
+                        field_failures.append(
+                            "last_update_time too old (age_min={:.2f}, limit={})".format(
+                                age_minutes,
+                                max_age_min,
+                            )
+                        )
 
-        # Step 4: Validate presence of all dynamically expected DOM sensor fields.
         for field in expected_fields:
             if field not in sensor_data:
-                field_failures.append("expected DOM field missing in STATE_DB sensor data: {}".format(field))
+                field_failures.append(
+                    "expected DOM field missing in STATE_DB sensor data: {}".format(field)
+                )
 
         if field_failures:
             all_failures.append("{}:\n  {}".format(port, "\n  ".join(field_failures)))
 
-    # Step 5: Final decision for skip/fail.
     if not has_configured_checks:
         pytest.skip("No DOM availability checks configured from DOM_ATTRIBUTES")
 
