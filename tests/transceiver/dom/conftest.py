@@ -487,11 +487,40 @@ def dom_sensor_by_port(dom_per_test_snapshots):
     return dom_per_test_snapshots["baseline"]["sensor_by_port"]
 
 
+@pytest.fixture(scope="module")
+def parse_dom_numeric():
+    """Return the shared DOM numeric parser."""
+    return parse_numeric
+
 
 @pytest.fixture(scope="module")
 def parse_dom_update_time():
     """Return the shared DOM last_update_time parser."""
     return parse_update_time
+
+
+@pytest.fixture(scope="module")
+def dom_operational_suffix():
+    """Return the DOM operational-range attribute suffix."""
+    return OPERATIONAL_SUFFIX
+
+
+@pytest.fixture(scope="module")
+def dom_lane_num_placeholder():
+    """Return the DOM lane placeholder used by lane-expanded attributes."""
+    return LANE_NUM_PLACEHOLDER
+
+
+@pytest.fixture(scope="module")
+def dom_expand_operational_fields():
+    """Return the DOM operational field expansion helper."""
+    return expand_operational_fields
+
+
+@pytest.fixture(scope="module")
+def dom_get_lane_count():
+    """Return the DOM lane-count helper."""
+    return get_lane_count
 
 
 @pytest.fixture(scope="module")
