@@ -1,1 +1,243 @@
-<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="0" skipped="0" tests="1" time="22.233" timestamp="2026-07-21T07:10:23.774446+00:00" hostname="8f787b236a2e"><properties><property name="topology" value="m0" /><property name="testbed" value="single-dut-mgmt45" /><property name="timestamp" value="2026-07-21 07:10:29.801081" /><property name="host" value="str-nexthop_4010-01" /><property name="asic" value="broadcom" /><property name="platform" value="x86_64-nexthop_4010-r1" /><property name="hwsku" value="NH-4010" /><property name="os_version" value="202505.1-EFT3.Nexthop" /></properties><testcase classname="tests.transceiver.dom.test_dom_availability" name="test_dom_data_availability_verification" time="22.066"><properties><property name="start" value="2026-07-21 07:10:23.898375" /><property name="end" value="2026-07-21 07:10:45.969131" /></properties></testcase></testsuite></testsuites>
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="1" time="23.342" timestamp="2026-07-21T10:08:13.605067+00:00" hostname="8f787b236a2e"><properties><property name="topology" value="m0" /><property name="testbed" value="single-dut-mgmt45" /><property name="timestamp" value="2026-07-21 10:08:19.520095" /><property name="host" value="str-nexthop_4010-01" /><property name="asic" value="broadcom" /><property name="platform" value="x86_64-nexthop_4010-r1" /><property name="hwsku" value="NH-4010" /><property name="os_version" value="202505.1-EFT3.Nexthop" /></properties><testcase classname="tests.transceiver.dom.test_dom_threshold" name="test_dom_threshold_validation" time="23.075"><properties><property name="start" value="2026-07-21 10:08:13.746384" /><property name="end" value="2026-07-21 10:08:36.913363" /></properties><failure message="Failed: DOM threshold validation failures:&#10;Ethernet0:&#10;  rx_power_threshold_range expected lowalarm=-9.8, got -8.401&#10;  rx_power_threshold_range expected lowwarning=-8.8, got -7.899&#10;  rx_power_threshold_range expected highalarm=6.0, got 5.5&#10;  tx_bias_threshold_range expected lowalarm=10.0, got 70.0&#10;  tx_bias_threshold_range expected lowwarning=15.0, got 80.0&#10;  tx_bias_threshold_range expected highwarning=380.0, got 350.0&#10;  tx_bias_threshold_range expected highalarm=400.0, got 380.0&#10;  txLANE_NUMbias_operational_range operational range [20.0, 350.0] is not within warning bounds (80.0, 350.0)&#10;  tx_power_threshold_range expected lowalarm=-5.3, got -4.9&#10;  tx_power_threshold_range expected lowwarning=-4.3, got -2.9&#10;  tx_power_threshold_range expected highwarning=4.5, got 4.0&#10;  tx_power_threshold_range expected highalarm=5.5, got 6.0&#10;  txLANE_NUMpower_operational_range operational range [-4.0, 3.5] is not within warning bounds (-2.9, 4.0)&#10;Ethernet8:&#10;  rx_power_threshold_range expected lowalarm=-9.8, got -8.401&#10;  rx_power_threshold_range expected lowwarning=-8.8, got -7.399&#10;  rx_power_threshold_range expected highwarning=5.0, got 5.5&#10;  rx_power_threshold_range expected highalarm=6.0, got 6.5&#10;  tx_power_threshold_range expected lowalarm=-5.3, got -4.9&#10;  tx_power_threshold_range expected lowwarning=-4.3, got -3.9&#10;  tx_power_threshold_range expected highwarning=4.5, got 5.0&#10;  tx_power_threshold_range expected highalarm=5.5, got 6.0&#10;  txLANE_NUMpower_operational_range operational range [-4.0, 3.5] is not within warning bounds (-3.9, 5.0)">duthost = &lt;MultiAsicSonicHost str-nexthop_4010-01&gt;, dom_ports = ['Ethernet0', 'Ethernet8']
+dom_port_context = {'Ethernet0': {'base': {'cable_type': 'FR', 'deployment': '400G_STRAIGHT', 'form_factor': 'OSFP', 'hardware_rev': '1.0... 3, 'data_max_age_min': 5, 'laser_temperature_consistency_variation_threshold': 3.0, 'max_update_time_sec': 150, ...}}}
+dom_threshold_fields_by_port = {'Ethernet0': {'rx_power_threshold_range': {'highalarm': 'rxpowerhighalarm', 'highwarning': 'rxpowerhighwarning', 'low...ghalarm', 'highwarning': 'txpowerhighwarning', 'lowalarm': 'txpowerlowalarm', 'lowwarning': 'txpowerlowwarning'}, ...}}
+dom_threshold_by_port = {'Ethernet0': {'lasertemphighalarm': '0.0', 'lasertemphighwarning': '0.0', 'lasertemplowalarm': '0.0', 'lasertemplowwa...ertemphighalarm': '0.0', 'lasertemphighwarning': '0.0', 'lasertemplowalarm': '0.0', 'lasertemplowwarning': '0.0', ...}}
+parse_dom_numeric = &lt;function parse_numeric at 0x7fc9059a59e0&gt;
+dom_threshold_field_suffixes = ('lowalarm', 'lowwarning', 'highwarning', 'highalarm'), dom_threshold_suffix = '_threshold_range'
+dom_threshold_value_tolerance = 0.01, dom_operational_attr_candidates = &lt;function operational_attr_candidates at 0x7fc9059a5da0&gt;
+
+    def test_dom_threshold_validation(
+        duthost,
+        dom_ports,
+        dom_port_context,
+        dom_threshold_fields_by_port,
+        dom_threshold_by_port,
+        parse_dom_numeric,
+        dom_threshold_field_suffixes,
+        dom_threshold_suffix,
+        dom_threshold_value_tolerance,
+        dom_operational_attr_candidates,
+    ):
+        """Verify configured DOM threshold ranges against STATE_DB threshold data."""
+        if duthost.facts.get("asic_type") == "vs":
+            pytest.skip("Skipping DOM verification on virtual switch testbed")
+    
+        all_failures = []
+        has_configured_checks = False
+        checked_attrs_by_port = {}
+        checked_fields_by_port = {}
+    
+        for port in dom_ports:
+            dom_attrs = dom_port_context[port]["dom"]
+            threshold_fields = dom_threshold_fields_by_port.get(port, {})
+            threshold_data = dom_threshold_by_port.get(port, {})
+            field_failures = []
+            checked_attrs = 0
+            checked_fields = 0
+    
+            for attr_name, attr_value in sorted(dom_attrs.items()):
+                if not attr_name.endswith(dom_threshold_suffix):
+                    continue
+    
+                has_configured_checks = True
+                attr_failure_count = len(field_failures)
+    
+                if not isinstance(attr_value, dict):
+                    field_failures.append(
+                        "{} must be a dict with {} in DOM_ATTRIBUTES".format(
+                            attr_name,
+                            dom_threshold_field_suffixes,
+                        )
+                    )
+                    continue
+    
+                expected_thresholds = {}
+                for logical_key in dom_threshold_field_suffixes:
+                    expected = parse_dom_numeric(attr_value.get(logical_key))
+                    if expected is None:
+                        field_failures.append(
+                            "{} missing numeric {} in DOM_ATTRIBUTES".format(attr_name, logical_key)
+                        )
+                        continue
+                    expected_thresholds[logical_key] = expected
+    
+                if len(expected_thresholds) != len(dom_threshold_field_suffixes):
+                    continue
+    
+                if not (
+                    expected_thresholds["lowalarm"]
+                    &lt; expected_thresholds["lowwarning"]
+                    &lt; expected_thresholds["highwarning"]
+                    &lt; expected_thresholds["highalarm"]
+                ):
+                    field_failures.append(
+                        "{} configured hierarchy lowalarm &lt; lowwarning &lt; highwarning &lt; highalarm "
+                        "is violated".format(attr_name)
+                    )
+                    continue
+    
+                if not threshold_data:
+                    field_failures.append("{} threshold table missing in STATE_DB".format(attr_name))
+                    continue
+    
+                field_map = threshold_fields.get(attr_name, {})
+                if not field_map:
+                    field_failures.append("{} has no STATE_DB threshold field mapping".format(attr_name))
+                    continue
+    
+                actual_thresholds = {}
+                for logical_key in dom_threshold_field_suffixes:
+                    db_field = field_map.get(logical_key)
+                    actual = parse_dom_numeric(threshold_data.get(db_field))
+                    if actual is None:
+                        field_failures.append(
+                            "{} threshold field {} missing/non-numeric in STATE_DB".format(
+                                attr_name,
+                                db_field,
+                            )
+                        )
+                        continue
+                    actual_thresholds[logical_key] = actual
+    
+                if len(actual_thresholds) != len(dom_threshold_field_suffixes):
+                    continue
+    
+                for logical_key in dom_threshold_field_suffixes:
+                    expected = expected_thresholds[logical_key]
+                    actual = actual_thresholds[logical_key]
+                    if abs(actual - expected) &gt; dom_threshold_value_tolerance:
+                        field_failures.append(
+                            "{} expected {}={}, got {}".format(
+                                attr_name,
+                                logical_key,
+                                expected,
+                                actual,
+                            )
+                        )
+    
+                if not (
+                    actual_thresholds["lowalarm"]
+                    &lt; actual_thresholds["lowwarning"]
+                    &lt; actual_thresholds["highwarning"]
+                    &lt; actual_thresholds["highalarm"]
+                ):
+                    field_failures.append(
+                        "{} STATE_DB hierarchy lowalarm &lt; lowwarning &lt; highwarning &lt; highalarm "
+                        "is violated".format(attr_name)
+                    )
+    
+                base_name = attr_name[:-len(dom_threshold_suffix)]
+                for operational_attr in dom_operational_attr_candidates(base_name):
+                    if operational_attr not in dom_attrs:
+                        continue
+    
+                    operational_range = dom_attrs.get(operational_attr)
+                    if not isinstance(operational_range, dict):
+                        field_failures.append(
+                            "{} must be a dict with min/max in DOM_ATTRIBUTES".format(operational_attr)
+                        )
+                        continue
+    
+                    op_min = parse_dom_numeric(operational_range.get("min"))
+                    op_max = parse_dom_numeric(operational_range.get("max"))
+                    if op_min is None or op_max is None:
+                        field_failures.append(
+                            "{} missing numeric min/max in DOM_ATTRIBUTES".format(operational_attr)
+                        )
+                        continue
+    
+                    if not actual_thresholds["lowwarning"] &lt; op_min &lt;= op_max &lt; actual_thresholds["highwarning"]:
+                        field_failures.append(
+                            "{} operational range [{}, {}] is not within warning bounds ({}, {})".format(
+                                operational_attr,
+                                op_min,
+                                op_max,
+                                actual_thresholds["lowwarning"],
+                                actual_thresholds["highwarning"],
+                            )
+                        )
+    
+                if len(field_failures) == attr_failure_count:
+                    checked_attrs += 1
+                    checked_fields += len(field_map)
+                    logger.debug(
+                        "DOM threshold PASS %s %s fields=%s",
+                        port,
+                        attr_name,
+                        sorted(field_map.values()),
+                    )
+    
+            if field_failures:
+                all_failures.append("{}:\n  {}".format(port, "\n  ".join(field_failures)))
+            checked_attrs_by_port[port] = checked_attrs
+            checked_fields_by_port[port] = checked_fields
+    
+        if not has_configured_checks:
+            pytest.skip("No *_threshold_range attributes configured for DOM threshold validation")
+    
+        if all_failures:
+&gt;           pytest.fail("DOM threshold validation failures:\n" + "\n".join(all_failures))
+E           Failed: DOM threshold validation failures:
+E           Ethernet0:
+E             rx_power_threshold_range expected lowalarm=-9.8, got -8.401
+E             rx_power_threshold_range expected lowwarning=-8.8, got -7.899
+E             rx_power_threshold_range expected highalarm=6.0, got 5.5
+E             tx_bias_threshold_range expected lowalarm=10.0, got 70.0
+E             tx_bias_threshold_range expected lowwarning=15.0, got 80.0
+E             tx_bias_threshold_range expected highwarning=380.0, got 350.0
+E             tx_bias_threshold_range expected highalarm=400.0, got 380.0
+E             txLANE_NUMbias_operational_range operational range [20.0, 350.0] is not within warning bounds (80.0, 350.0)
+E             tx_power_threshold_range expected lowalarm=-5.3, got -4.9
+E             tx_power_threshold_range expected lowwarning=-4.3, got -2.9
+E             tx_power_threshold_range expected highwarning=4.5, got 4.0
+E             tx_power_threshold_range expected highalarm=5.5, got 6.0
+E             txLANE_NUMpower_operational_range operational range [-4.0, 3.5] is not within warning bounds (-2.9, 4.0)
+E           Ethernet8:
+E             rx_power_threshold_range expected lowalarm=-9.8, got -8.401
+E             rx_power_threshold_range expected lowwarning=-8.8, got -7.399
+E             rx_power_threshold_range expected highwarning=5.0, got 5.5
+E             rx_power_threshold_range expected highalarm=6.0, got 6.5
+E             tx_power_threshold_range expected lowalarm=-5.3, got -4.9
+E             tx_power_threshold_range expected lowwarning=-4.3, got -3.9
+E             tx_power_threshold_range expected highwarning=4.5, got 5.0
+E             tx_power_threshold_range expected highalarm=5.5, got 6.0
+E             txLANE_NUMpower_operational_range operational range [-4.0, 3.5] is not within warning bounds (-3.9, 5.0)
+
+actual     = 3.63
+actual_thresholds = {'highalarm': 3.63, 'highwarning': 3.465, 'lowalarm': 2.97, 'lowwarning': 3.135}
+all_failures = ['Ethernet0:\n  rx_power_threshold_range expected lowalarm=-9.8, got -8.401\n  rx_power_threshold_range expected lowwa..., got 6.0\n  txLANE_NUMpower_operational_range operational range [-4.0, 3.5] is not within warning bounds (-3.9, 5.0)']
+attr_failure_count = 9
+attr_name  = 'voltage_threshold_range'
+attr_value = {'highalarm': 3.63, 'highwarning': 3.46, 'lowalarm': 2.97, 'lowwarning': 3.13}
+base_name  = 'voltage'
+checked_attrs = 3
+checked_attrs_by_port = {'Ethernet0': 2, 'Ethernet8': 3}
+checked_fields = 12
+checked_fields_by_port = {'Ethernet0': 8, 'Ethernet8': 12}
+db_field   = 'vcchighalarm'
+dom_attrs  = {'consistency_check_poll_count': 3, 'data_max_age_min': 5, 'laser_temperature_consistency_variation_threshold': 3.0, 'max_update_time_sec': 150, ...}
+dom_operational_attr_candidates = &lt;function operational_attr_candidates at 0x7fc9059a5da0&gt;
+dom_port_context = {'Ethernet0': {'base': {'cable_type': 'FR', 'deployment': '400G_STRAIGHT', 'form_factor': 'OSFP', 'hardware_rev': '1.0... 3, 'data_max_age_min': 5, 'laser_temperature_consistency_variation_threshold': 3.0, 'max_update_time_sec': 150, ...}}}
+dom_ports  = ['Ethernet0', 'Ethernet8']
+dom_threshold_by_port = {'Ethernet0': {'lasertemphighalarm': '0.0', 'lasertemphighwarning': '0.0', 'lasertemplowalarm': '0.0', 'lasertemplowwa...ertemphighalarm': '0.0', 'lasertemphighwarning': '0.0', 'lasertemplowalarm': '0.0', 'lasertemplowwarning': '0.0', ...}}
+dom_threshold_field_suffixes = ('lowalarm', 'lowwarning', 'highwarning', 'highalarm')
+dom_threshold_fields_by_port = {'Ethernet0': {'rx_power_threshold_range': {'highalarm': 'rxpowerhighalarm', 'highwarning': 'rxpowerhighwarning', 'low...ghalarm', 'highwarning': 'txpowerhighwarning', 'lowalarm': 'txpowerlowalarm', 'lowwarning': 'txpowerlowwarning'}, ...}}
+dom_threshold_suffix = '_threshold_range'
+dom_threshold_value_tolerance = 0.01
+duthost    = &lt;MultiAsicSonicHost str-nexthop_4010-01&gt;
+expected   = 3.63
+expected_thresholds = {'highalarm': 3.63, 'highwarning': 3.46, 'lowalarm': 2.97, 'lowwarning': 3.13}
+field_failures = ['rx_power_threshold_range expected lowalarm=-9.8, got -8.401', 'rx_power_threshold_range expected lowwarning=-8.8, go..._threshold_range expected lowalarm=-5.3, got -4.9', 'tx_power_threshold_range expected lowwarning=-4.3, got -3.9', ...]
+field_map  = {'highalarm': 'vcchighalarm', 'highwarning': 'vcchighwarning', 'lowalarm': 'vcclowalarm', 'lowwarning': 'vcclowwarning'}
+has_configured_checks = True
+logical_key = 'highalarm'
+op_max     = 3.45
+op_min     = 3.15
+operational_attr = 'voltage_operational_range'
+operational_range = {'max': 3.45, 'min': 3.15}
+parse_dom_numeric = &lt;function parse_numeric at 0x7fc9059a59e0&gt;
+port       = 'Ethernet8'
+threshold_data = {'lasertemphighalarm': '0.0', 'lasertemphighwarning': '0.0', 'lasertemplowalarm': '0.0', 'lasertemplowwarning': '0.0', ...}
+threshold_fields = {'rx_power_threshold_range': {'highalarm': 'rxpowerhighalarm', 'highwarning': 'rxpowerhighwarning', 'lowalarm': 'rxpow...ighalarm', 'highwarning': 'txpowerhighwarning', 'lowalarm': 'txpowerlowalarm', 'lowwarning': 'txpowerlowwarning'}, ...}
+
+tests/transceiver/dom/test_dom_threshold.py:178: Failed</failure></testcase></testsuite></testsuites>
