@@ -19,10 +19,28 @@ STATE_DB = "STATE_DB"
 CONFIG_DB = "CONFIG_DB"
 
 STATE_DB_SENSOR_KEY_TEMPLATE = "TRANSCEIVER_DOM_SENSOR|{}"
+STATE_DB_THRESHOLD_KEY_TEMPLATE = "TRANSCEIVER_DOM_THRESHOLD|{}"
 CONFIG_DB_PORT_KEY_TEMPLATE = "PORT|{}"
 
 OPERATIONAL_SUFFIX = "_operational_range"
+THRESHOLD_SUFFIX = "_threshold_range"
 LANE_NUM_PLACEHOLDER = "LANE_NUM"
+
+THRESHOLD_FIELD_SUFFIXES = ("lowalarm", "lowwarning", "highwarning", "highalarm")
+THRESHOLD_PREFIX_OVERRIDES = {
+    "temperature": "temp",
+    "voltage": "vcc",
+    "tx_power": "txpower",
+    "rx_power": "rxpower",
+    "tx_bias": "txbias",
+    "laser_temperature": "lasertemp",
+}
+THRESHOLD_TO_OPERATIONAL_ATTR_CANDIDATES = {
+    "tx_bias": ("txLANE_NUMbias_operational_range", "tx_bias_operational_range"),
+    "tx_power": ("txLANE_NUMpower_operational_range", "tx_power_operational_range"),
+    "rx_power": ("rxLANE_NUMpower_operational_range", "rx_power_operational_range"),
+}
+THRESHOLD_VALUE_TOLERANCE = 0.01
 
 DOM_POLLING_ENABLED_VALUES = ("", "enabled")
 DOM_POLLING_DISABLED_VALUE = "disabled"
@@ -131,6 +149,29 @@ def expand_operational_fields(attr_name, lane_count):
         base_name.replace(LANE_NUM_PLACEHOLDER, str(lane))
         for lane in range(1, lane_count + 1)
     ]
+
+
+def build_threshold_field_map(attr_name):
+    """Build logical threshold keys to STATE_DB threshold field names."""
+    base_name = attr_name[:-len(THRESHOLD_SUFFIX)]
+    prefix = THRESHOLD_PREFIX_OVERRIDES.get(base_name, base_name.replace("_", ""))
+    return {
+        suffix: "{}{}".format(prefix, suffix)
+        for suffix in THRESHOLD_FIELD_SUFFIXES
+    }
+
+
+def threshold_field_map(attr_name):
+    """Return threshold STATE_DB field mappings for threshold attributes only."""
+    if not attr_name.endswith(THRESHOLD_SUFFIX):
+        return {}
+    return build_threshold_field_map(attr_name)
+
+
+def operational_attr_candidates(base_name):
+    """Return operational range attribute names related to a threshold base name."""
+    default = ("{}_operational_range".format(base_name),)
+    return THRESHOLD_TO_OPERATIONAL_ATTR_CANDIDATES.get(base_name, default)
 
 
 def _port_namespace(duthost, port):
@@ -416,8 +457,18 @@ def dom_db_reader(duthost):
             namespace=namespace,
         )
 
+    def _read_threshold(port):
+        namespace = _port_namespace(duthost, port)
+        return hgetall_dict(
+            duthost,
+            STATE_DB,
+            STATE_DB_THRESHOLD_KEY_TEMPLATE.format(port),
+            namespace=namespace,
+        )
+
     return {
         "sensor": _read_sensor,
+        "threshold": _read_threshold,
     }
 
 
@@ -521,6 +572,56 @@ def dom_expand_operational_fields():
 def dom_get_lane_count():
     """Return the DOM lane-count helper."""
     return get_lane_count
+
+
+@pytest.fixture(scope="module")
+def dom_threshold_suffix():
+    """Return the DOM threshold-range attribute suffix."""
+    return THRESHOLD_SUFFIX
+
+
+@pytest.fixture(scope="module")
+def dom_threshold_field_suffixes():
+    """Return logical threshold suffixes in hierarchy order."""
+    return THRESHOLD_FIELD_SUFFIXES
+
+
+@pytest.fixture(scope="module")
+def dom_threshold_value_tolerance():
+    """Return numeric tolerance used when comparing threshold values."""
+    return THRESHOLD_VALUE_TOLERANCE
+
+
+@pytest.fixture(scope="module")
+def dom_operational_attr_candidates():
+    """Return helper that maps a threshold base name to operational attributes."""
+    return operational_attr_candidates
+
+
+@pytest.fixture(scope="module")
+def dom_threshold_fields_by_port(dom_port_context):
+    """Return threshold attribute to STATE_DB field mappings for each DOM port."""
+    fields_by_port = {}
+    for port, context in dom_port_context.items():
+        attr_to_fields = {}
+        for attr_name, attr_value in sorted(context["dom"].items()):
+            if not isinstance(attr_value, dict):
+                continue
+            field_map = threshold_field_map(attr_name)
+            if field_map:
+                attr_to_fields[attr_name] = field_map
+        fields_by_port[port] = attr_to_fields
+    return fields_by_port
+
+
+@pytest.fixture(scope="module")
+def dom_threshold_by_port(dom_ports, dom_db_reader):
+    """Read baseline TRANSCEIVER_DOM_THRESHOLD data for each DOM port."""
+    read_threshold = dom_db_reader["threshold"]
+    return {
+        port: read_threshold(port)
+        for port in dom_ports
+    }
 
 
 @pytest.fixture(scope="module")
