@@ -47,7 +47,7 @@ of the transceiver DOM test framework.
 ## New DOM Fixtures
 - `_dom_session_prerequisites`: Session autouse DOM category gate that requests shared presence, gold firmware, link-up, and DOM polling-enabled prerequisites before DOM tests run.
 - `dom_port_context`: Filters `port_attributes_dict` to ports with non-empty `DOM_ATTRIBUTES`.
-- `dom_ports`: DOM-enabled port list sorted by interface prefix + numeric suffix (e.g., `Ethernet0, Ethernet4, Ethernet8, Ethernet12`).
+- `dom_ports`: DOM-enabled port list sorted with `natsort.natsorted` for deterministic interface order (e.g., `Ethernet0, Ethernet4, Ethernet8, Ethernet12`).
 - `dom_operational_suffix`, `dom_lane_num_placeholder`, `dom_expand_operational_fields`, `dom_get_lane_count`: DOM field-expansion helpers exposed to test modules through fixtures.
 - `dom_threshold_suffix`, `dom_threshold_field_suffixes`, `dom_threshold_value_tolerance`, `dom_operational_attr_candidates`: DOM threshold validation helpers exposed to test modules through fixtures.
 - `dom_operational_fields_by_port`: Expands configured operational attributes to expected sensor fields, including `LANE_NUM` lane expansion.
@@ -57,8 +57,9 @@ of the transceiver DOM test framework.
 - `dom_threshold_fields_by_port`: Builds threshold key mappings for `TRANSCEIVER_DOM_THRESHOLD`.
 - `dom_sensor_by_port` / `dom_threshold_by_port`: Bulk reads from STATE_DB hash tables.
 - `dom_db_reader`: Callable fixture for repeated sensor/threshold reads during polling tests.
-- `dom_per_test_snapshots`: Autouse per-test fixture that records interface status and DOM sensor snapshots before and after each DOM test, then dispatches link liveness/stability checks through the shared health-check framework. Freshness remains a test assertion so TC1 reports missing/stale/unparseable `last_update_time` as a test failure instead of a pre-check skip or post-check session exit.
+- `dom_per_test_snapshots`: Autouse per-test fixture that records baseline DOM sensor snapshots for test-body validation. DOM link-up remains covered by the shared session `links_verified` gate instead of per-test DOM health-check skip/exit paths.
 - `dom_freshness_failures`: Shared test-body helper used by TC1 and TC2 to validate `last_update_time` freshness from `data_max_age_min`; it returns failure strings and never calls health-check skip/exit paths.
+- `dom_freshness_age_minutes`: Shared test-body helper used for success-path logging of `last_update_time` age versus the configured freshness limit.
 - `parse_dom_numeric` / `parse_dom_update_time`: Robust parsers for numeric fields and `last_update_time`.
 - `dom_now_utc`: DUT-time based UTC clock source for freshness checks.
 - DOM parser compatibility: supports both standard HGETALL key/value line output and single-line serialized dict output from platform wrappers.
@@ -106,8 +107,9 @@ of the transceiver DOM test framework.
 - For attributes configured in DOM shards, required mapped STATE_DB fields must exist and be parseable for the corresponding test case; missing/non-parseable values are failures.
 - Local data-flow validation was run with `DutInfoLoader -> AttributeManager -> TemplateValidator` for DUT `str-nexthop_4010-01`; `Ethernet0` and `Ethernet8` produced `DOM_ATTRIBUTES` and both ports were fully compliant with the `400G_STRAIGHT` template.
 - TC4 consistency variation thresholds are optional per `dom_test_plan.md`; absent threshold attributes use default limits, while configured invalid threshold values still fail.
-- DOM per-test setup now captures interface status before each test and checks admin/oper liveness before and after the test. The liveness and optional post-test stability checks are logged with per-port PASS/FAIL details before being submitted to the shared health-check framework. If the platform exposes a comparable `flap_count`/`last_change` style marker in interface status output, the post-test check verifies it did not advance.
+- DOM per-test setup now captures DOM sensor data only. Link liveness is intentionally left to the shared session `links_verified` prerequisite, and link-stability checks are not implemented without a real flap-count or last-change data source.
 - DOM freshness is intentionally not routed through `run_pre_check` or `run_post_check`; TC1 availability and TC2 operational range validation share `dom_freshness_failures` in the test body so freshness failures fail the relevant test case rather than skip the test or abort the session. TC3 threshold validation does not perform freshness checks.
+- TC1 availability success logs include per-port checked field counts and `last_update_time` age versus `data_max_age_min`.
 - STATE_DB access uses `sonic-db-cli STATE_DB HGETALL`, with `redis-cli --raw -n 6` fallback.
 - DB hash reads support multi-ASIC DUTs by trying `sonic-db-cli -n <frontend-asic-namespace> <DB> HGETALL ...` before falling back to the default namespace.
 - DOM polling-state checks read CONFIG_DB `PORT|<port>` through the DOM `read_config_db_hash` helper; missing `dom_polling` is treated as default-enabled, `enabled` passes, `disabled` skips the DOM session prerequisite, and unexpected values skip with a clear diagnostic.
