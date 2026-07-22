@@ -10,7 +10,7 @@ def test_dom_sensor_operational_range_validation(
     dom_port_context,
     dom_sensor_by_port,
     parse_dom_numeric,
-    parse_dom_update_time,
+    dom_freshness_failures,
     dom_now_utc,
     dom_operational_suffix,
     dom_lane_num_placeholder,
@@ -24,7 +24,7 @@ def test_dom_sensor_operational_range_validation(
         dom_port_context: Per-port DOM context with configured DOM attributes.
         dom_sensor_by_port: Per-test baseline ``TRANSCEIVER_DOM_SENSOR`` data keyed by port.
         parse_dom_numeric: Parser for numeric DOM values.
-        parse_dom_update_time: Parser for DOM ``last_update_time`` values.
+        dom_freshness_failures: Callable that returns DOM freshness validation failures.
         dom_now_utc: Callable that returns the current UTC time.
 
     Returns:
@@ -50,21 +50,7 @@ def test_dom_sensor_operational_range_validation(
         if max_age_min is not None:
             has_configured_checks = True
 
-        if max_age_min is not None:
-            if not sensor_data:
-                field_failures.append("missing TRANSCEIVER_DOM_SENSOR data for freshness check")
-            else:
-                parsed_time = parse_dom_update_time(sensor_data.get("last_update_time"))
-                if parsed_time is None:
-                    field_failures.append(
-                        "last_update_time missing or unparsable while data_max_age_min is configured"
-                    )
-                else:
-                    age_minutes = (now_utc - parsed_time).total_seconds() / 60.0
-                    if age_minutes > float(max_age_min):
-                        field_failures.append(
-                            "last_update_time too old (age_min={:.2f}, limit={})".format(age_minutes, max_age_min)
-                        )
+        field_failures.extend(dom_freshness_failures(sensor_data, max_age_min, now_utc))
 
         # Step 3: Dynamically derive expected sensor fields from *_operational_range attributes.
         lane_count = dom_get_lane_count(base_attrs)
