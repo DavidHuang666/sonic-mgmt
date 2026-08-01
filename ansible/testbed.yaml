@@ -1,6 +1,6 @@
 ---
 
-- conf-name: single-dut-mgmt51
+- conf-name: single-dut-mgmt53
   group-name: mgmt-only
   topo: m0
   vm_base: ""
