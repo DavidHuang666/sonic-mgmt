@@ -27,7 +27,7 @@ def _format_port_failure(port, active_lanes, expected_fields, field_failures):
     )
 
 
-def _parse_operational_range(field, mapped_field):
+def _parse_operational_range(mapped_field):
     """Return ``(min_value, max_value, error)`` for one mapped DOM field."""
     attr_name = mapped_field.source_attr
     attr_value = mapped_field.attr_value
@@ -39,6 +39,8 @@ def _parse_operational_range(field, mapped_field):
     max_value = parse_numeric(attr_value.get("max"))
     if min_value is None or max_value is None:
         return None, None, "{} missing numeric min/max in DOM_ATTRIBUTES".format(attr_name)
+    if not math.isfinite(min_value) or not math.isfinite(max_value):
+        return None, None, "{} has non-finite min/max in DOM_ATTRIBUTES".format(attr_name)
     if min_value > max_value:
         return None, None, "{} has invalid range [{}, {}]".format(
             attr_name,
@@ -68,12 +70,13 @@ def _validate_dom_operational_ranges(
         active_lanes = availability_plan.get("active_media_lanes", [])
         field_failures = list(availability_plan.get("errors", []))
         max_age_min = availability_plan.get("max_age_min")
+        has_operational_checks = bool(expected_fields or field_failures)
 
-        if max_age_min is not None or expected_fields or field_failures:
+        if has_operational_checks:
             checked_port_count += 1
 
         freshness_age_min = None
-        if max_age_min is not None:
+        if max_age_min is not None and has_operational_checks:
             if now_utc is None:
                 now_utc = duthost.get_now_time(utc_timezone=True)
             result = check_dom_sensor_freshness(sensor_data, max_age_min, now_utc)
@@ -89,7 +92,7 @@ def _validate_dom_operational_ranges(
 
         checked_fields = 0
         for field, mapped_field in expected_fields.items():
-            min_value, max_value, range_error = _parse_operational_range(field, mapped_field)
+            min_value, max_value, range_error = _parse_operational_range(mapped_field)
             if range_error:
                 field_failures.append(range_error)
                 continue
