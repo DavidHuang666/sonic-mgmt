@@ -1,151 +1,184 @@
 import logging
+import math
 
 import pytest
+
+from tests.transceiver.common.db_helpers import parse_numeric
+from tests.transceiver.dom.dom_helpers import (
+    build_dom_availability_plan,
+    check_dom_sensor_freshness,
+    read_dom_sensor_data,
+)
 
 logger = logging.getLogger(__name__)
 
 
-def test_dom_sensor_operational_range_validation(
+def _format_optional_float(value):
+    return "{:.2f}".format(value) if value is not None else "not-available"
+
+
+def _format_port_failure(port, active_lanes, expected_fields, field_failures):
+    """Prefix a port's failure block with its expected shape."""
+    return "{} [{} expected field(s), media lanes {}]:\n  {}".format(
+        port,
+        len(expected_fields),
+        active_lanes or "none",
+        "\n  ".join(field_failures),
+    )
+
+
+def _parse_operational_range(mapped_field):
+    """Return ``(min_value, max_value, error)`` for one mapped DOM field."""
+    attr_name = mapped_field.source_attr
+    attr_value = mapped_field.attr_value
+
+    if not isinstance(attr_value, dict):
+        return None, None, "{} must be a dict with min/max in DOM_ATTRIBUTES".format(attr_name)
+
+    min_value = parse_numeric(attr_value.get("min"))
+    max_value = parse_numeric(attr_value.get("max"))
+    if min_value is None or max_value is None:
+        return None, None, "{} missing numeric min/max in DOM_ATTRIBUTES".format(attr_name)
+    if not math.isfinite(min_value) or not math.isfinite(max_value):
+        return None, None, "{} has non-finite min/max in DOM_ATTRIBUTES".format(attr_name)
+    if min_value > max_value:
+        return None, None, "{} has invalid range [{}, {}]".format(
+            attr_name,
+            attr_value.get("min"),
+            attr_value.get("max"),
+        )
+
+    return min_value, max_value, None
+
+
+def _validate_dom_operational_ranges(
     duthost,
-    dom_ports,
-    dom_port_context,
-    dom_sensor_by_port,
-    parse_dom_numeric,
-    parse_dom_update_time,
-    dom_now_utc,
-    dom_operational_suffix,
-    dom_lane_num_placeholder,
-    dom_expand_operational_fields,
-    dom_get_lane_count,
+    dom_primary_ports,
+    sensor_by_port,
+    availability_plan_by_port,
 ):
-    """Verify configured DOM sensor values are within operational ranges."""
-    if duthost.facts.get("asic_type") == "vs":
-        pytest.skip("Skipping DOM verification on virtual switch testbed")
+    """Validate configured DOM sensor fields are fresh and within range."""
+    failures = []
+    checked_field_count = 0
+    checked_port_count = 0
+    now_utc = None
 
-    all_failures = []
-    has_configured_checks = False
-    now_utc = dom_now_utc()
-    checked_fields_by_port = {}
+    for port in dom_primary_ports:
+        sensor_data = sensor_by_port.get(port, {})
+        availability_plan = availability_plan_by_port.get(port, {})
+        expected_fields = availability_plan.get("expected_fields", {})
+        active_lanes = availability_plan.get("active_media_lanes", [])
+        field_failures = list(availability_plan.get("errors", []))
+        max_age_min = availability_plan.get("max_age_min")
+        has_operational_checks = bool(expected_fields or field_failures)
 
-    for port in dom_ports:
-        context = dom_port_context[port]
-        dom_attrs = context["dom"]
-        sensor_data = dom_sensor_by_port.get(port, {})
-        field_failures = []
+        if has_operational_checks:
+            checked_port_count += 1
+
+        freshness_age_min = None
+        if max_age_min is not None and has_operational_checks:
+            if now_utc is None:
+                now_utc = duthost.get_now_time(utc_timezone=True)
+            result = check_dom_sensor_freshness(sensor_data, max_age_min, now_utc)
+            field_failures.extend(result["failures"])
+            freshness_age_min = result["age_minutes"]
+
+        if not sensor_data:
+            for field in expected_fields:
+                field_failures.append("{} DOM sensor table missing".format(field))
+            if field_failures:
+                failures.append(_format_port_failure(port, active_lanes, expected_fields, field_failures))
+            continue
+
         checked_fields = 0
-
-        max_age_min = dom_attrs.get("data_max_age_min")
-        if max_age_min is not None:
-            has_configured_checks = True
-            if not sensor_data:
-                field_failures.append("missing TRANSCEIVER_DOM_SENSOR data for freshness check")
-            else:
-                try:
-                    max_age = float(max_age_min)
-                except (TypeError, ValueError):
-                    field_failures.append(
-                        "invalid data_max_age_min={!r} in DOM_ATTRIBUTES".format(max_age_min)
-                    )
-                else:
-                    parsed_time = parse_dom_update_time(sensor_data.get("last_update_time"))
-                    if parsed_time is None:
-                        field_failures.append(
-                            "last_update_time missing or unparsable while data_max_age_min is configured"
-                        )
-                    else:
-                        age_minutes = (now_utc - parsed_time).total_seconds() / 60.0
-                        if age_minutes > max_age:
-                            field_failures.append(
-                                "last_update_time too old (age_min={:.2f}, limit={})".format(
-                                    age_minutes,
-                                    max_age_min,
-                                )
-                            )
-
-        lane_count = dom_get_lane_count(context["base"])
-        for attr_name, attr_value in sorted(dom_attrs.items()):
-            if not attr_name.endswith(dom_operational_suffix):
+        for field, mapped_field in expected_fields.items():
+            min_value, max_value, range_error = _parse_operational_range(mapped_field)
+            if range_error:
+                field_failures.append(range_error)
                 continue
 
-            has_configured_checks = True
-            if not isinstance(attr_value, dict):
+            if field not in sensor_data:
                 field_failures.append(
-                    "{} must be a dict with min/max in DOM_ATTRIBUTES".format(attr_name)
+                    "expected DOM field missing in STATE_DB sensor data: {}".format(field)
                 )
                 continue
 
-            min_value = parse_dom_numeric(attr_value.get("min"))
-            max_value = parse_dom_numeric(attr_value.get("max"))
-            if min_value is None or max_value is None:
-                field_failures.append("{} missing numeric min/max in DOM_ATTRIBUTES".format(attr_name))
-                continue
-            if min_value > max_value:
+            raw_value = sensor_data[field]
+            numeric_value = parse_numeric(raw_value)
+            if numeric_value is None or not math.isfinite(numeric_value):
                 field_failures.append(
-                    "{} has invalid range [{}, {}]".format(attr_name, attr_value.get("min"), attr_value.get("max"))
+                    "{} missing/non-finite operational value in STATE_DB (raw={!r})".format(
+                        field,
+                        raw_value,
+                    )
                 )
                 continue
 
-            fields = dom_expand_operational_fields(attr_name, lane_count)
-            if not fields and dom_lane_num_placeholder in attr_name:
+            if not min_value <= numeric_value <= max_value:
                 field_failures.append(
-                    "{} uses {} but {} has no valid lane count".format(
-                        attr_name,
-                        dom_lane_num_placeholder,
-                        port,
+                    "{} value {} out of range [{}, {}]".format(
+                        field,
+                        numeric_value,
+                        min_value,
+                        max_value,
                     )
                 )
                 continue
 
-            for field in fields:
-                if not sensor_data:
-                    field_failures.append("{} DOM sensor table missing".format(field))
-                    continue
+            checked_fields += 1
+            logger.debug(
+                "DOM operational range PASS %s %s=%s within [%s, %s] "
+                "(source_attr=%s media_lanes=%s freshness_age_min=%s freshness_limit_min=%s)",
+                port,
+                field,
+                numeric_value,
+                min_value,
+                max_value,
+                mapped_field.source_attr,
+                active_lanes or "none",
+                _format_optional_float(freshness_age_min),
+                max_age_min if max_age_min is not None else "not-configured",
+            )
 
-                raw_value = sensor_data.get(field)
-                numeric_value = parse_dom_numeric(raw_value)
-                if numeric_value is None:
-                    field_failures.append(
-                        "{} missing/non-numeric operational value in STATE_DB (raw={!r})".format(
-                            field,
-                            raw_value,
-                        )
-                    )
-                    continue
-
-                if not min_value <= numeric_value <= max_value:
-                    field_failures.append(
-                        "{} value {} out of range [{}, {}]".format(
-                            field,
-                            numeric_value,
-                            min_value,
-                            max_value,
-                        )
-                    )
-                    continue
-
-                checked_fields += 1
-                logger.debug(
-                    "DOM operational range PASS %s %s=%s within [%s, %s]",
-                    port,
-                    field,
-                    numeric_value,
-                    min_value,
-                    max_value,
-                )
+        checked_field_count += checked_fields
 
         if field_failures:
-            all_failures.append("{}:\n  {}".format(port, "\n  ".join(field_failures)))
-        checked_fields_by_port[port] = checked_fields
+            failures.append(_format_port_failure(port, active_lanes, expected_fields, field_failures))
 
-    if not has_configured_checks:
+    return failures, checked_field_count, checked_port_count
+
+
+def test_dom_sensor_operational_range_validation(
+    duthost,
+    dom_primary_ports,
+    port_attributes_dict,
+    lport_to_first_subport_mapping,
+):
+    """Verify configured DOM sensor values are fresh and within operational ranges."""
+    sensor_by_port, sensor_read_errors = read_dom_sensor_data(duthost, dom_primary_ports)
+    availability_plan_by_port = build_dom_availability_plan(
+        port_attributes_dict,
+        dom_primary_ports,
+        lport_to_first_subport_mapping,
+    )
+
+    all_failures = ["STATE_DB read:\n  {}".format(read_error) for read_error in sensor_read_errors]
+    range_failures, checked_field_count, checked_port_count = _validate_dom_operational_ranges(
+        duthost,
+        dom_primary_ports,
+        sensor_by_port,
+        availability_plan_by_port,
+    )
+    all_failures.extend(range_failures)
+
+    if not (all_failures or checked_port_count):
         pytest.skip("No *_operational_range attributes configured for DOM operational range validation")
 
     if all_failures:
         pytest.fail("DOM operational range validation failures:\n" + "\n".join(all_failures))
 
-    total_checked_fields = sum(checked_fields_by_port.values())
     logger.info(
         "DOM operational range validation passed: %d field(s) across %d port(s)",
-        total_checked_fields,
-        len(checked_fields_by_port),
+        checked_field_count,
+        checked_port_count,
     )
