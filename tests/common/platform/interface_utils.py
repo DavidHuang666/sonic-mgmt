@@ -318,3 +318,15 @@ def get_lport_to_first_subport_mapping(duthost, logical_intfs=None):
     first_subport_dict = {k: pport_to_lport_mapping[v][0] for k, v in physical_port_indices.items()}
     logging.debug("First subports mapping: {}".format(first_subport_dict))
     return first_subport_dict
+
+
+def is_first_subport(port, lport_to_first_subport):
+    """
+    @summary: Return True iff ``port`` is the first logical sub-port of its
+        breakout group. A port absent from the map is treated as not-first.
+    @param port: logical interface name (e.g. "Ethernet0").
+    @param lport_to_first_subport: mapping from
+        :func:`get_lport_to_first_subport_mapping`.
+    """
+    first = lport_to_first_subport.get(port)
+    return first is not None and first == port
