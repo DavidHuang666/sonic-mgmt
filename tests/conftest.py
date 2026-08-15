@@ -3898,3 +3898,16 @@ def yang_validation_check(request, duthosts):
             error_summary.append(f"{host}: {result['error']}")
 
         pt_assert(False, "post-test YANG validation failed:\n" + "\n".join(error_summary))
+
+
+@pytest.fixture(scope="session")
+def ansible_root(request):
+    """
+    Returns the ansible directory.
+    """
+    ansible_config_path = os.getenv("ANSIBLE_CONFIG", None)
+    if ansible_config_path:
+        return pathlib.Path(ansible_config_path)
+    else:
+        tbfile = request.config.getoption("testbed_file")
+        return pathlib.Path(tbfile).parent
