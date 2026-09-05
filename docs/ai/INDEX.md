@@ -86,10 +86,20 @@ of the transceiver DOM test framework.
   - Category-level DOM defaults for data freshness, polling interval, consistency poll count, and shutdown thresholds.
 - `ansible/files/transceiver/inventory/attributes/dom/transceivers/vendors/ACCELIGHT/part_numbers/AGP80SC0CW41002/dom.json`
   - Per-PN operational ranges, threshold ranges, and TC4 consistency variation thresholds for the Accelight module.
+- `ansible/files/transceiver/inventory/attributes/dom/transceivers/vendors/EOPTOLINK/part_numbers/EOLO-138HG-5HSD5/dom.json`
+  - Per-PN operational ranges, threshold ranges, and TC4 consistency variation thresholds for the Eoptolink module observed on `Ethernet0`.
+- `ansible/files/transceiver/inventory/attributes/dom/transceivers/vendors/ARISTA_NETWORKS/part_numbers/OSFP-800G-2XDR4/dom.json`
+  - Per-PN operational ranges, threshold ranges, and TC4 consistency variation thresholds for the Arista Networks module observed on `Ethernet8`.
+- `ansible/files/transceiver/inventory/normalization_mappings.json`
+  - Expanded vendor-name and part-number normalization so the Eoptolink and Arista PN-specific DOM shards resolve correctly.
 - `ansible/files/transceiver/inventory/attributes/eeprom/eeprom.json`
   - Category-level EEPROM defaults migrated from the old flat `attributes/eeprom.json`.
 - `ansible/files/transceiver/inventory/attributes/eeprom/transceivers/vendors/ACCELIGHT/part_numbers/AGP80SC0CW41002/eeprom.json`
   - Per-PN EEPROM attributes migrated from the old flat `attributes/eeprom.json`.
+- `ansible/files/transceiver/inventory/attributes/eeprom/transceivers/vendors/EOPTOLINK/part_numbers/EOLO-138HG-5HSD5/eeprom.json`
+  - Per-PN EEPROM attributes for the Eoptolink module observed on `Ethernet0` / `Ethernet4`.
+- `ansible/files/transceiver/inventory/attributes/eeprom/transceivers/vendors/ARISTA_NETWORKS/part_numbers/OSFP-800G-2XDR4/eeprom.json`
+  - Per-PN EEPROM attributes for the Arista Networks module observed on `Ethernet8` / `Ethernet12`.
 - `ansible/files/transceiver/inventory/templates/deployment_templates.json`
   - Updated to validate current `400G_STRAIGHT` BASE and DOM attribute coverage with the shard-based attribute names.
 - Removed old architecture remnants:
@@ -118,6 +128,8 @@ of the transceiver DOM test framework.
 - Basic DOM TC1-TC4 test files do not declare explicit topology markers; topology selection is left to the shared pytest/testbed infrastructure.
 - TC4 DOM consistency polling now batches ports by `(consistency_check_poll_count, max_update_time_sec)` and sleeps once per poll group instead of once per port, preserving per-port attribute-driven polling settings while reducing runtime on multi-port devices.
 - TC2 operational range PASS debug logging uses standard logging `%s` placeholders only; mixing `{}` placeholders with logging arguments can raise `TypeError` during pytest log formatting and falsely fail an otherwise passing range check.
+- `str-nexthop_4010-01` DOM inventory was re-aligned to the actual modules observed in the lab: `Ethernet0` resolves to `Eoptolink / EOLO-138HG-5HSD5`, while `Ethernet8` resolves to `Arista Networks / OSFP-800G-2XDR4`.
+- `str-nexthop_4010-01` EEPROM inventory was re-aligned to the same two module families so the EEPROM shard loader can resolve `dual_bank_supported` and CMIS firmware metadata for the lab modules.
 
 ## EEPROM Bring-Up Notes
 - Inventory files updated for Accelight OSFP module bring-up:
@@ -129,7 +141,7 @@ of the transceiver DOM test framework.
   - `ansible/files/transceiver/inventory/prerequisites.json`
 - Key data flow alignment:
   - `dut_info` now scopes to currently detected optics ports (`Ethernet0/4/8/12`) to avoid failing on absent modules.
-  - `normalization_mappings` now maps `Accelight` and `AGP80SC0CW41002` for vendor/PN based attribute resolution.
+  - `normalization_mappings` now maps `Accelight` / `AGP80SC0CW41002` plus the observed `Eoptolink` / `EOLO-138HG-5HSD5` and `Arista Networks` / `OSFP-800G-2XDR4` pairs for vendor/PN based attribute resolution.
   - EEPROM shard files now provide category defaults and vendor+PN specific EEPROM attributes (`dual_bank_supported`, firmware versions, `cmis_revision`).
   - `prerequisites.json` EEPROM entry now points to an existing function (`test_eeprom_content_verification_via_show_cli`) to avoid missing-function pretest failures.
-  - DOM shard files now use parser-compatible vendor key (`ACCELIGHT`) and global timing/freshness thresholds in `defaults` so `DOM_ATTRIBUTES` can resolve correctly for current module part number.
+  - DOM shard files now use parser-compatible vendor keys (`ACCELIGHT`, `EOPTOLINK`, `ARISTA_NETWORKS`) and global timing/freshness thresholds in `defaults` so `DOM_ATTRIBUTES` can resolve correctly for the currently observed module part numbers.

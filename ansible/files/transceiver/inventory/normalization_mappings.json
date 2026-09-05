@@ -1,8 +1,12 @@
 {
   "vendor_names": {
-    "Accelight": "ACCELIGHT"
+    "Accelight": "ACCELIGHT",
+    "Eoptolink": "EOPTOLINK",
+    "Arista Networks": "ARISTA_NETWORKS"
   },
   "part_numbers": {
-    "AGP80SC0CW41002": "AGP80SC0CW41002"
+    "AGP80SC0CW41002": "AGP80SC0CW41002",
+    "EOLO-138HG-5HSD5": "EOLO-138HG-5HSD5",
+    "OSFP-800G-2XDR4": "OSFP-800G-2XDR4"
   }
 }

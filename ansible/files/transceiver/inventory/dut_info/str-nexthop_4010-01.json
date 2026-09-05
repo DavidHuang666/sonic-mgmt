@@ -8,18 +8,44 @@
     "hardware_rev": "1.0"
   },
   "Ethernet0,Ethernet4": {
-    "vendor_sn": "W5027810000003"
+    "vendor_name": "Eoptolink",
+    "vendor_pn": "EOLO-138HG-5HSD5",
+    "vendor_sn": "XKT191900003",
+    "vendor_date": "2025-04-11",
+    "vendor_oui": "70-ee-a3",
+    "vendor_rev": "01",
+    "hardware_rev": "1.0"
   },
   "Ethernet8,Ethernet12": {
-    "vendor_sn": "W5027810000039"
+    "vendor_name": "Arista Networks",
+    "vendor_pn": "OSFP-800G-2XDR4",
+    "vendor_sn": "XTG261800001",
+    "vendor_date": "2026-04-27",
+    "vendor_oui": "00-1c-73",
+    "vendor_rev": "52",
+    "hardware_rev": "2.0"
   },
   "Ethernet0": {
+    "vendor_name": "Eoptolink",
+    "vendor_pn": "EOLO-138HG-5HSD5",
+    "vendor_sn": "XKT191900003",
+    "vendor_date": "2025-04-11",
+    "vendor_oui": "70-ee-a3",
+    "vendor_rev": "01",
+    "hardware_rev": "1.0",
     "transceiver_configuration": "FR-800-OSFP-2x400G_400G_SIDE-0x0F-0x0F"
   },
   "Ethernet4": {
     "transceiver_configuration": "FR-800-OSFP-2x400G_400G_SIDE-0xF0-0xF0"
   },
   "Ethernet8": {
+    "vendor_name": "Arista Networks",
+    "vendor_pn": "OSFP-800G-2XDR4",
+    "vendor_sn": "XTG261800001",
+    "vendor_date": "2026-04-27",
+    "vendor_oui": "00-1c-73",
+    "vendor_rev": "52",
+    "hardware_rev": "2.0",
     "transceiver_configuration": "FR-800-OSFP-2x400G_400G_SIDE-0x0F-0x0F"
   },
   "Ethernet12": {
