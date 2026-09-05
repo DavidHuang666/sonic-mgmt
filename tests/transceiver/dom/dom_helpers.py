@@ -24,10 +24,20 @@ logger = logging.getLogger(__name__)
 
 STATE_DB_SENSOR_TABLE = "TRANSCEIVER_DOM_SENSOR"
 STATE_DB_THRESHOLD_TABLE = "TRANSCEIVER_DOM_THRESHOLD"
+STATE_DB_STATUS_TABLE = "TRANSCEIVER_STATUS"
+STATE_DB_DOM_FLAG_TABLE = "TRANSCEIVER_DOM_FLAG"
+STATE_DB_DOM_FLAG_CHANGE_COUNT_TABLE = "TRANSCEIVER_DOM_FLAG_CHANGE_COUNT"
+STATE_DB_DOM_FLAG_SET_TIME_TABLE = "TRANSCEIVER_DOM_FLAG_SET_TIME"
+STATE_DB_DOM_FLAG_CLEAR_TIME_TABLE = "TRANSCEIVER_DOM_FLAG_CLEAR_TIME"
+STATE_DB_STATUS_FLAG_TABLE = "TRANSCEIVER_STATUS_FLAG"
+STATE_DB_STATUS_FLAG_CHANGE_COUNT_TABLE = "TRANSCEIVER_STATUS_FLAG_CHANGE_COUNT"
+STATE_DB_STATUS_FLAG_SET_TIME_TABLE = "TRANSCEIVER_STATUS_FLAG_SET_TIME"
+STATE_DB_STATUS_FLAG_CLEAR_TIME_TABLE = "TRANSCEIVER_STATUS_FLAG_CLEAR_TIME"
 
 OPERATIONAL_SUFFIX = "_operational_range"
 THRESHOLD_SUFFIX = "_threshold_range"
 CONSISTENCY_SUFFIX = "_consistency_variation_threshold"
+DEVIATION_SUFFIX = "_deviation_range"
 CONSISTENCY_MODE_ABSOLUTE = "absolute"
 CONSISTENCY_MODE_PERCENT = "percent"
 LANE_NUM_PLACEHOLDER = "LANE_NUM"
@@ -36,7 +46,14 @@ DomMappedField = namedtuple("DomMappedField", ("source_attr", "attr_value"))
 DomThresholdMappedField = namedtuple("DomThresholdMappedField", ("source_attr", "attr_value", "threshold_key"))
 DomQuantitySpec = namedtuple(
     "DomQuantitySpec",
-    ("threshold_db_prefix", "sensor_field_template", "operational_attr", "consistency_unit", "consistency_mode"),
+    (
+        "threshold_db_prefix",
+        "sensor_field_template",
+        "operational_attr",
+        "consistency_unit",
+        "consistency_mode",
+        "deviation_unit",
+    ),
 )
 
 THRESHOLD_FIELD_SUFFIXES = ("lowalarm", "lowwarning", "highwarning", "highalarm")
@@ -47,14 +64,23 @@ DOM_QUANTITY_REGISTRY = {
         "temperature_operational_range",
         "C",
         CONSISTENCY_MODE_ABSOLUTE,
+        "C",
     ),
-    "voltage": DomQuantitySpec("vcc", "voltage", "voltage_operational_range", "V", CONSISTENCY_MODE_ABSOLUTE),
+    "voltage": DomQuantitySpec(
+        "vcc",
+        "voltage",
+        "voltage_operational_range",
+        "V",
+        CONSISTENCY_MODE_ABSOLUTE,
+        "V",
+    ),
     "laser_temperature": DomQuantitySpec(
         "lasertemp",
         "laser_temperature",
         "laser_temperature_operational_range",
         "C",
         CONSISTENCY_MODE_ABSOLUTE,
+        "C",
     ),
     "tx_power": DomQuantitySpec(
         "txpower",
@@ -62,6 +88,7 @@ DOM_QUANTITY_REGISTRY = {
         "txLANE_NUMpower_operational_range",
         "dB",
         CONSISTENCY_MODE_ABSOLUTE,
+        "dBm",
     ),
     "rx_power": DomQuantitySpec(
         "rxpower",
@@ -69,6 +96,7 @@ DOM_QUANTITY_REGISTRY = {
         "rxLANE_NUMpower_operational_range",
         "dB",
         CONSISTENCY_MODE_ABSOLUTE,
+        "dBm",
     ),
     "tx_bias": DomQuantitySpec(
         "txbias",
@@ -76,6 +104,7 @@ DOM_QUANTITY_REGISTRY = {
         "txLANE_NUMbias_operational_range",
         "%",
         CONSISTENCY_MODE_PERCENT,
+        "mA",
     ),
 }
 THRESHOLD_FIELD_PREFIXES = {
@@ -97,6 +126,10 @@ CONSISTENCY_UNITS_BY_BASE = {
 }
 CONSISTENCY_MODES_BY_BASE = {
     base_name: spec.consistency_mode
+    for base_name, spec in DOM_QUANTITY_REGISTRY.items()
+}
+DEVIATION_UNITS_BY_BASE = {
+    base_name: spec.deviation_unit
     for base_name, spec in DOM_QUANTITY_REGISTRY.items()
 }
 
@@ -246,6 +279,22 @@ def consistency_mode_for_attr(attr_name):
         return None
     base_name = attr_name[:-len(CONSISTENCY_SUFFIX)]
     return CONSISTENCY_MODES_BY_BASE.get(base_name)
+
+
+def deviation_field_template_for_attr(attr_name):
+    """Return the STATE_DB sensor field template for a deviation-range attribute."""
+    if not attr_name.endswith(DEVIATION_SUFFIX):
+        return None
+    base_name = attr_name[:-len(DEVIATION_SUFFIX)]
+    return CONSISTENCY_FIELD_TEMPLATES_BY_BASE.get(base_name)
+
+
+def deviation_unit_for_attr(attr_name):
+    """Return the output unit for a configured deviation-range attribute."""
+    if not attr_name.endswith(DEVIATION_SUFFIX):
+        return None
+    base_name = attr_name[:-len(DEVIATION_SUFFIX)]
+    return DEVIATION_UNITS_BY_BASE.get(base_name)
 
 
 def dom_consistency_attributes():
@@ -608,6 +657,51 @@ def read_dom_sensor_data(duthost, ports):
 def read_dom_threshold_data(duthost, ports):
     """Return ``({port: data_or_None}, errors)`` for current DOM threshold data."""
     return _read_dom_table_data(duthost, ports, STATE_DB_THRESHOLD_TABLE)
+
+
+def read_transceiver_status_data(duthost, ports):
+    """Return ``({port: data_or_None}, errors)`` for current transceiver status data."""
+    return _read_dom_table_data(duthost, ports, STATE_DB_STATUS_TABLE)
+
+
+def read_dom_flag_data(duthost, ports):
+    """Return ``({port: data_or_None}, errors)`` for current DOM flag data."""
+    return _read_dom_table_data(duthost, ports, STATE_DB_DOM_FLAG_TABLE)
+
+
+def read_dom_flag_change_count_data(duthost, ports):
+    """Return ``({port: data_or_None}, errors)`` for current DOM flag change counts."""
+    return _read_dom_table_data(duthost, ports, STATE_DB_DOM_FLAG_CHANGE_COUNT_TABLE)
+
+
+def read_dom_flag_set_time_data(duthost, ports):
+    """Return ``({port: data_or_None}, errors)`` for current DOM flag set timestamps."""
+    return _read_dom_table_data(duthost, ports, STATE_DB_DOM_FLAG_SET_TIME_TABLE)
+
+
+def read_dom_flag_clear_time_data(duthost, ports):
+    """Return ``({port: data_or_None}, errors)`` for current DOM flag clear timestamps."""
+    return _read_dom_table_data(duthost, ports, STATE_DB_DOM_FLAG_CLEAR_TIME_TABLE)
+
+
+def read_transceiver_status_flag_data(duthost, ports):
+    """Return ``({port: data_or_None}, errors)`` for current transceiver status flags."""
+    return _read_dom_table_data(duthost, ports, STATE_DB_STATUS_FLAG_TABLE)
+
+
+def read_transceiver_status_flag_change_count_data(duthost, ports):
+    """Return ``({port: data_or_None}, errors)`` for transceiver status flag change counts."""
+    return _read_dom_table_data(duthost, ports, STATE_DB_STATUS_FLAG_CHANGE_COUNT_TABLE)
+
+
+def read_transceiver_status_flag_set_time_data(duthost, ports):
+    """Return ``({port: data_or_None}, errors)`` for transceiver status flag set timestamps."""
+    return _read_dom_table_data(duthost, ports, STATE_DB_STATUS_FLAG_SET_TIME_TABLE)
+
+
+def read_transceiver_status_flag_clear_time_data(duthost, ports):
+    """Return ``({port: data_or_None}, errors)`` for transceiver status flag clear timestamps."""
+    return _read_dom_table_data(duthost, ports, STATE_DB_STATUS_FLAG_CLEAR_TIME_TABLE)
 
 
 def check_dom_sensor_freshness(sensor_data, max_age_min, now_utc):

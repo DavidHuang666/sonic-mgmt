@@ -77,7 +77,7 @@ of the transceiver DOM test framework.
 - `tests/transceiver/dom/test_dom_consistency.py`
   - TC4: polling-based consistency checks with timestamp progression and threshold-driven variation validation using flat consistency threshold attributes (`tx/rx power`, `tx bias`, `laser/module temperature`, `voltage`); absent `consistency_check_poll_count` and `max_update_time_sec` use `dom_test_plan.md` defaults of `3` and `60`; long polling waits log per-group wait/completion progress.
 - `tests/transceiver/dom/advanced/test_dom_interface_state.py`
-  - Advanced TC1 skeleton (currently explicit skip).
+  - Advanced TC1: validates DOM behavior across interface shutdown/startup, including local Tx shutdown behavior, remote Rx link-down behavior, flag lifecycle metadata, APPL_DB port down-time metadata, startup recovery, and configured post-startup deviation checks.
 - `tests/transceiver/dom/advanced/test_dom_polling.py`
   - Advanced TC2 skeleton (currently explicit skip).
 
@@ -130,6 +130,10 @@ of the transceiver DOM test framework.
 - TC2 operational range PASS debug logging uses standard logging `%s` placeholders only; mixing `{}` placeholders with logging arguments can raise `TypeError` during pytest log formatting and falsely fail an otherwise passing range check.
 - `str-nexthop_4010-01` DOM inventory was re-aligned to the actual modules observed in the lab: `Ethernet0` resolves to `Eoptolink / EOLO-138HG-5HSD5`, while `Ethernet8` resolves to `Arista Networks / OSFP-800G-2XDR4`.
 - `str-nexthop_4010-01` EEPROM inventory was re-aligned to the same two module families so the EEPROM shard loader can resolve `dual_bank_supported` and CMIS firmware metadata for the lab modules.
+- Advanced TC1 resolves the remote side from `conn_graph_facts["device_conn"][duthost.hostname][local_port]`, using the shared Remote-Side Port Resolution contract from `docs/testplan/transceiver/test_plan.md`.
+- Advanced TC1 shuts down/restores the local breakout group through `tests.transceiver.common.scenario_ops`; it does not run inline shell commands in the test body.
+- Advanced TC1 reads `TRANSCEIVER_DOM_SENSOR`, `TRANSCEIVER_STATUS`, `TRANSCEIVER_DOM_FLAG`, `TRANSCEIVER_DOM_FLAG_*`, `TRANSCEIVER_STATUS_FLAG`, `TRANSCEIVER_STATUS_FLAG_*`, and APPL_DB `PORT_TABLE` to correlate sensor values, flags, metadata counters, and event timestamps.
+- Advanced TC1 startup validation reuses DOM operational-range planning and applies configured `_deviation_range` attributes by comparing `post-startup value - baseline value` per field/lane.
 
 ## EEPROM Bring-Up Notes
 - Inventory files updated for Accelight OSFP module bring-up:
