@@ -138,6 +138,16 @@ of the transceiver DOM test framework.
 - Advanced TC1 reads `TRANSCEIVER_DOM_SENSOR`, `TRANSCEIVER_STATUS`, `TRANSCEIVER_DOM_FLAG`, `TRANSCEIVER_DOM_FLAG_*`, `TRANSCEIVER_STATUS_FLAG`, `TRANSCEIVER_STATUS_FLAG_*`, and APPL_DB `PORT_TABLE` to correlate sensor values, flags, metadata counters, and event timestamps.
 - Advanced TC1 uses APPL_DB `PORT_TABLE.last_down_time` to correlate shutdown events; current SONiC images do not publish `PORT_TABLE.last_update_time` for these rows.
 - Advanced TC1 startup validation reuses DOM operational-range planning and applies configured `_deviation_range` attributes by comparing `post-startup value - baseline value` per field/lane.
+
+## Advanced DOM TC1 Refactor Notes
+- `tests/transceiver/dom/advanced/test_dom_interface_state.py` owns the Advanced TC1 shutdown/startup flow only.
+- Reusable DOM table reads, timestamp correlation, flag lifecycle validation,
+  sensor update polling, operational-field checks, and deviation checks live in
+  `tests/transceiver/dom/dom_helpers.py`.
+- Remote peer resolution lives in `tests/transceiver/common/topology.py` and
+  uses `conn_graph_facts["device_conn"][duthost.hostname][local_port]`.
+- APPL_DB `PORT_TABLE` shutdown correlation uses `last_down_time`; DOM
+  freshness still uses `TRANSCEIVER_DOM_SENSOR.last_update_time`.
 - Advanced TC1 lane-expanded deviation attributes such as `txLANE_NUMbias_deviation_range` map through the DOM quantity registry by matching the corresponding operational attribute base (`txLANE_NUMbias_operational_range`) to the sensor field template (`tx{}bias`).
 
 ## EEPROM Bring-Up Notes
