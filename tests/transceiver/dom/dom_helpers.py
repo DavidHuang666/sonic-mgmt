@@ -12,6 +12,7 @@ from tests.transceiver.attribute_parser.attribute_keys import (
     BASE_ATTRIBUTES_KEY,
     DOM_ATTRIBUTES_KEY,
 )
+from tests.transceiver.common import scenario_ops
 from tests.transceiver.common.db_helpers import (
     check_entry_freshness,
     get_config_db_port_table,
@@ -136,6 +137,8 @@ DEVIATION_UNITS_BY_BASE = {
 DOM_POLLING_ENABLED_VALUES = ("", "enabled")
 DOM_POLLING_DISABLED_VALUE = "disabled"
 
+DOM_RECOVERY_POLL_INTERVAL_SEC = 20
+
 
 def _active_media_lanes(primary_port, port_attributes_dict, lport_to_first_subport_mapping):
     """Return ``(active_lanes, errors)`` for a primary subport.
@@ -257,43 +260,50 @@ def _operational_attr_for_threshold(attr_name):
     return THRESHOLD_TO_OPERATIONAL_ATTR.get(base_name)
 
 
+def _quantity_base_name_for_attr(attr_name, suffix):
+    """Return the DOM quantity registry key for an attribute name."""
+    if not attr_name.endswith(suffix):
+        return None
+
+    attr_base_name = attr_name[:-len(suffix)]
+    if attr_base_name in DOM_QUANTITY_REGISTRY:
+        return attr_base_name
+
+    for base_name, spec in DOM_QUANTITY_REGISTRY.items():
+        operational_base_name = spec.operational_attr[:-len(OPERATIONAL_SUFFIX)]
+        if attr_base_name == operational_base_name:
+            return base_name
+
+    return None
+
+
 def consistency_field_template_for_attr(attr_name):
     """Return the STATE_DB sensor field template for a consistency attribute."""
-    if not attr_name.endswith(CONSISTENCY_SUFFIX):
-        return None
-    base_name = attr_name[:-len(CONSISTENCY_SUFFIX)]
+    base_name = _quantity_base_name_for_attr(attr_name, CONSISTENCY_SUFFIX)
     return CONSISTENCY_FIELD_TEMPLATES_BY_BASE.get(base_name)
 
 
 def consistency_unit_for_attr(attr_name):
     """Return the output unit for a configured consistency attribute."""
-    if not attr_name.endswith(CONSISTENCY_SUFFIX):
-        return None
-    base_name = attr_name[:-len(CONSISTENCY_SUFFIX)]
+    base_name = _quantity_base_name_for_attr(attr_name, CONSISTENCY_SUFFIX)
     return CONSISTENCY_UNITS_BY_BASE.get(base_name)
 
 
 def consistency_mode_for_attr(attr_name):
     """Return the validation mode for a configured consistency attribute."""
-    if not attr_name.endswith(CONSISTENCY_SUFFIX):
-        return None
-    base_name = attr_name[:-len(CONSISTENCY_SUFFIX)]
+    base_name = _quantity_base_name_for_attr(attr_name, CONSISTENCY_SUFFIX)
     return CONSISTENCY_MODES_BY_BASE.get(base_name)
 
 
 def deviation_field_template_for_attr(attr_name):
     """Return the STATE_DB sensor field template for a deviation-range attribute."""
-    if not attr_name.endswith(DEVIATION_SUFFIX):
-        return None
-    base_name = attr_name[:-len(DEVIATION_SUFFIX)]
+    base_name = _quantity_base_name_for_attr(attr_name, DEVIATION_SUFFIX)
     return CONSISTENCY_FIELD_TEMPLATES_BY_BASE.get(base_name)
 
 
 def deviation_unit_for_attr(attr_name):
     """Return the output unit for a configured deviation-range attribute."""
-    if not attr_name.endswith(DEVIATION_SUFFIX):
-        return None
-    base_name = attr_name[:-len(DEVIATION_SUFFIX)]
+    base_name = _quantity_base_name_for_attr(attr_name, DEVIATION_SUFFIX)
     return DEVIATION_UNITS_BY_BASE.get(base_name)
 
 
@@ -495,6 +505,38 @@ def parse_min_max_range(mapped_field):
         )
 
     return min_value, max_value, None
+
+
+def dom_field_available(field, _mapped_field, raw_value):
+    """``field_check`` callback: DOM field is present with a finite numeric value."""
+    value = parse_numeric(raw_value)
+    if value is None or not math.isfinite(value):
+        return "expected DOM field {} has no valid finite value (got {!r})".format(
+            field,
+            raw_value,
+        )
+    return None
+
+
+def dom_field_in_operational_range(field, mapped_field, raw_value):
+    """``field_check`` callback: DOM field is available and within its configured range."""
+    min_value, max_value, range_error = parse_min_max_range(mapped_field)
+    if range_error:
+        return range_error
+
+    error = dom_field_available(field, mapped_field, raw_value)
+    if error:
+        return error
+
+    value = parse_numeric(raw_value)
+    if not min_value <= value <= max_value:
+        return "{} value {} out of range [{}, {}]".format(
+            field,
+            value,
+            min_value,
+            max_value,
+        )
+    return None
 
 
 def validate_dom_plan_fields(
@@ -712,3 +754,50 @@ def check_dom_sensor_freshness(sensor_data, max_age_min, now_utc):
         now_utc,
         table_name=STATE_DB_SENSOR_TABLE,
     )
+
+
+def verify_dom_recovered(duthost, port_attributes_dict, ports,
+                         lport_to_first_subport_mapping, baseline_sensor_data):
+    """Confirm DOM data recovered after a disruptive operation. Polls until the sensor
+    entry is republished and every configured field is readable, then asserts each field
+    is within its operational range.
+
+    Returns a list of failure strings (empty on success).
+    """
+    dom_attrs = port_attributes_dict[ports[0]].get(DOM_ATTRIBUTES_KEY, {})
+    if dom_attrs.get("data_max_age_min") is None:
+        return [f"{ports[0]}: {DOM_ATTRIBUTES_KEY} is missing data_max_age_min"]
+
+    plan_by_port = build_dom_sensor_plan(
+        port_attributes_dict, ports, lport_to_first_subport_mapping,
+    )
+
+    def _check_republished():
+        sensor_by_port, read_errors = read_dom_sensor_data(duthost, ports)
+        failures = [f"DOM sensor read error: {read_error}" for read_error in read_errors]
+        for port in ports:
+            updated = (sensor_by_port.get(port) or {}).get("last_update_time")
+            baseline = (baseline_sensor_data.get(port) or {}).get("last_update_time")
+            if updated is not None and updated == baseline:
+                failures.append(f"{port}: DOM data not republished; last_update_time still {updated}")
+        port_failures, _, _ = validate_dom_plan_fields(
+            duthost, ports, sensor_by_port, plan_by_port,
+            dom_field_available,
+            include_freshness_only=True,
+        )
+        return failures + port_failures
+
+    failures = scenario_ops.poll_ports_recovered(
+        _check_republished, dom_attrs["dom_info_recover_sec"],
+        DOM_RECOVERY_POLL_INTERVAL_SEC, "DOM recovery",
+    )
+    if failures:
+        return failures
+
+    sensor_by_port, read_errors = read_dom_sensor_data(duthost, ports)
+    port_failures, _, _ = validate_dom_plan_fields(
+        duthost, ports, sensor_by_port, plan_by_port,
+        dom_field_in_operational_range,
+        include_freshness_only=True,
+    )
+    return [f"DOM sensor read error: {read_error}" for read_error in read_errors] + port_failures

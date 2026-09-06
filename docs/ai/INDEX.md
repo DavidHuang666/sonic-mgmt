@@ -87,9 +87,11 @@ of the transceiver DOM test framework.
 - `ansible/files/transceiver/inventory/attributes/dom/transceivers/vendors/ACCELIGHT/part_numbers/AGP80SC0CW41002/dom.json`
   - Per-PN operational ranges, threshold ranges, and TC4 consistency variation thresholds for the Accelight module.
 - `ansible/files/transceiver/inventory/attributes/dom/transceivers/vendors/EOPTOLINK/part_numbers/EOLO-138HG-5HSD5/dom.json`
-  - Per-PN operational ranges, threshold ranges, and TC4 consistency variation thresholds for the Eoptolink module observed on `Ethernet0`.
+  - Per-PN operational ranges, threshold ranges, TC4 consistency variation thresholds, and Advanced TC1 deviation ranges for the Eoptolink module observed on `Ethernet0`.
 - `ansible/files/transceiver/inventory/attributes/dom/transceivers/vendors/ARISTA_NETWORKS/part_numbers/OSFP-800G-2XDR4/dom.json`
-  - Per-PN operational ranges, threshold ranges, and TC4 consistency variation thresholds for the Arista Networks module observed on `Ethernet8`.
+  - Per-PN operational ranges, threshold ranges, TC4 consistency variation thresholds, and Advanced TC1 deviation ranges for the Arista Networks module observed on `Ethernet8`.
+- `ansible/files/transceiver/inventory/attributes/system/system.json`
+  - Category-level system defaults for Advanced TC1 shut/no-shut settling: `port_shutdown_wait_sec=5` and `port_startup_wait_sec=60`.
 - `ansible/files/transceiver/inventory/normalization_mappings.json`
   - Expanded vendor-name and part-number normalization so the Eoptolink and Arista PN-specific DOM shards resolve correctly.
 - `ansible/files/transceiver/inventory/attributes/eeprom/eeprom.json`
@@ -131,9 +133,12 @@ of the transceiver DOM test framework.
 - `str-nexthop_4010-01` DOM inventory was re-aligned to the actual modules observed in the lab: `Ethernet0` resolves to `Eoptolink / EOLO-138HG-5HSD5`, while `Ethernet8` resolves to `Arista Networks / OSFP-800G-2XDR4`.
 - `str-nexthop_4010-01` EEPROM inventory was re-aligned to the same two module families so the EEPROM shard loader can resolve `dual_bank_supported` and CMIS firmware metadata for the lab modules.
 - Advanced TC1 resolves the remote side from `conn_graph_facts["device_conn"][duthost.hostname][local_port]`, using the shared Remote-Side Port Resolution contract from `docs/testplan/transceiver/test_plan.md`.
+- Advanced TC1 verify topology uses same-DUT loopback peers on `str-nexthop_4010-01` (`11.16.45.5`): local group `Ethernet0/Ethernet4` maps to remote group `Ethernet8/Ethernet12` through `ansible/files/sonic_lab_links.csv`.
 - Advanced TC1 shuts down/restores the local breakout group through `tests.transceiver.common.scenario_ops`; it does not run inline shell commands in the test body.
 - Advanced TC1 reads `TRANSCEIVER_DOM_SENSOR`, `TRANSCEIVER_STATUS`, `TRANSCEIVER_DOM_FLAG`, `TRANSCEIVER_DOM_FLAG_*`, `TRANSCEIVER_STATUS_FLAG`, `TRANSCEIVER_STATUS_FLAG_*`, and APPL_DB `PORT_TABLE` to correlate sensor values, flags, metadata counters, and event timestamps.
+- Advanced TC1 uses APPL_DB `PORT_TABLE.last_down_time` to correlate shutdown events; current SONiC images do not publish `PORT_TABLE.last_update_time` for these rows.
 - Advanced TC1 startup validation reuses DOM operational-range planning and applies configured `_deviation_range` attributes by comparing `post-startup value - baseline value` per field/lane.
+- Advanced TC1 lane-expanded deviation attributes such as `txLANE_NUMbias_deviation_range` map through the DOM quantity registry by matching the corresponding operational attribute base (`txLANE_NUMbias_operational_range`) to the sensor field template (`tx{}bias`).
 
 ## EEPROM Bring-Up Notes
 - Inventory files updated for Accelight OSFP module bring-up:
