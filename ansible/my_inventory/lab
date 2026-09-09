@@ -11,7 +11,7 @@ all:
         str-nexthop_4010-01:
           ansible_host: 11.16.45.5
           ansible_user: admin
-          ansible_password: YourPaSsWoRd
-          ansible_become_password: YourPaSsWoRd
+          ansible_password: yourpassword
+          ansible_become_password: yourpassword
           hwsku: NH-4010
           iface_speed: 800000
