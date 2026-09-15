@@ -153,13 +153,14 @@ of the transceiver DOM test framework.
   adapts `tests/common/platform/interface_utils.py::get_dev_conn` to return the
   peer host, device, raw port, and the primary port resolved with the peer
   DUT's logical-to-primary-subport mapping.
-- `tests/transceiver/conftest.py::port_attributes_by_dut` loads merged
-  transceiver attributes per DUT hostname. The selected DUT reuses
-  `port_attributes_dict`; peer DUTs use their own inventory, platform, and
-  HWSKU context.
-- `tests/transceiver/conftest.py::lport_to_first_subport_mapping_by_dut`
-  resolves breakout logical-to-primary-subport mappings independently for
-  every DUT in the testbed.
+- `tests/transceiver/conftest.py::port_attributes_for_dut` lazily loads and
+  caches merged transceiver attributes by DUT hostname. The selected DUT
+  reuses `port_attributes_dict`; an actually used peer follows the same base
+  load, category merge, and optional template-validation flow with its own
+  inventory, platform, and HWSKU context.
+- `tests/transceiver/conftest.py::lport_to_first_subport_mapping_for_dut`
+  lazily resolves and caches breakout logical-to-primary-subport mappings.
+  DUTs that are neither selected nor resolved as peers are not queried.
 - Operation contexts build local plans from local attributes and remote plans
   from remote-DUT attributes, so identical port names on different DUTs cannot
   accidentally share lane masks or thresholds.
@@ -173,6 +174,9 @@ of the transceiver DOM test framework.
 - Advanced TC1 lane-expanded deviation attributes such as `txLANE_NUMbias_deviation_range` map through the DOM quantity registry by matching the corresponding operational attribute base (`txLANE_NUMbias_operational_range`) to the sensor field template (`tx{}bias`).
 - TX/RX power readings are expressed in dBm, while a post-startup reading
   minus its baseline is a deviation in dB.
+- `tests/transceiver/common/unit_tests/test_topology.py` provides mocked
+  same-DUT, cross-DUT, multi-ASIC filtering, breakout-primary, missing-resource,
+  lazy-loader, and peer template-validation coverage without lab hardware.
 
 ## EEPROM Bring-Up Notes
 - Inventory files updated for Accelight OSFP module bring-up:
