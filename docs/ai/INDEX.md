@@ -158,9 +158,10 @@ of the transceiver DOM test framework.
   reuses `port_attributes_dict`; an actually used peer follows the same base
   load, category merge, and optional template-validation flow with its own
   inventory, platform, and HWSKU context.
-- `tests/transceiver/conftest.py::lport_to_first_subport_mapping_for_dut`
-  lazily resolves and caches breakout logical-to-primary-subport mappings.
-  DUTs that are neither selected nor resolved as peers are not queried.
+- `tests/transceiver/common/topology.py::resolve_remote_peer` queries
+  `get_lport_to_first_subport_mapping` only after resolving the actual peer
+  host. Advanced TC1 reuses the selected-DUT mapping for same-DUT peers and
+  queries a cross-DUT peer mapping only at the point of use.
 - Operation contexts build local plans from local attributes and remote plans
   from remote-DUT attributes, so identical port names on different DUTs cannot
   accidentally share lane masks or thresholds.
@@ -174,10 +175,6 @@ of the transceiver DOM test framework.
 - Advanced TC1 lane-expanded deviation attributes such as `txLANE_NUMbias_deviation_range` map through the DOM quantity registry by matching the corresponding operational attribute base (`txLANE_NUMbias_operational_range`) to the sensor field template (`tx{}bias`).
 - TX/RX power readings are expressed in dBm, while a post-startup reading
   minus its baseline is a deviation in dB.
-- `tests/transceiver/common/unit_tests/test_topology.py` provides mocked
-  same-DUT, cross-DUT, multi-ASIC filtering, breakout-primary, missing-resource,
-  lazy-loader, and peer template-validation coverage without lab hardware.
-
 ## EEPROM Bring-Up Notes
 - Inventory files updated for Accelight OSFP module bring-up:
   - `ansible/files/transceiver/inventory/dut_info/lab-dut-01.json`

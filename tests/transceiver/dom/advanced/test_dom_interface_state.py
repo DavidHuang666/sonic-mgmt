@@ -3,6 +3,9 @@ import logging
 
 import pytest
 
+from tests.common.platform.interface_utils import (
+    get_lport_to_first_subport_mapping,
+)
 from tests.transceiver.attribute_parser.attribute_keys import (
     DOM_ATTRIBUTES_KEY,
 )
@@ -248,24 +251,18 @@ def _operation_context(
     conn_graph_facts,
     local_port,
     port_attributes_for_dut,
-    lport_to_first_subport_mapping_for_dut,
+    local_port_mapping,
 ):
     """Return ``(context, errors)`` for one local primary port under test."""
     errors = []
     local_port_attributes, local_attr_error = port_attributes_for_dut(
         duthost.hostname,
     )
-    local_port_mapping, local_mapping_error = (
-        lport_to_first_subport_mapping_for_dut(duthost.hostname)
-    )
-    if local_port_attributes is None or local_port_mapping is None:
-        context_error = local_attr_error or local_mapping_error
-        if not context_error:
-            context_error = "mapping is unavailable"
+    if local_port_attributes is None:
         return None, [
-            "{} has no transceiver attribute/mapping context: {}".format(
+            "{} has no transceiver attribute context: {}".format(
                 duthost.hostname,
-                context_error,
+                local_attr_error or "attributes are unavailable",
             )
         ]
 
@@ -274,7 +271,6 @@ def _operation_context(
         duthosts,
         conn_graph_facts,
         local_port,
-        lport_to_first_subport_mapping_for_dut,
     )
     if error:
         return None, [error]
@@ -282,20 +278,29 @@ def _operation_context(
     remote_port_attributes, remote_attr_error = port_attributes_for_dut(
         remote.device,
     )
-    remote_port_mapping, remote_mapping_error = (
-        lport_to_first_subport_mapping_for_dut(remote.device)
-    )
-    if remote_port_attributes is None or remote_port_mapping is None:
-        context_error = remote_attr_error or remote_mapping_error
-        if not context_error:
-            context_error = "mapping is unavailable"
+    if remote_port_attributes is None:
         return None, [
-            "{} peer DUT {} has no transceiver context: {}".format(
+            "{} peer DUT {} has no transceiver attributes: {}".format(
                 local_port,
                 remote.device,
-                context_error,
+                remote_attr_error or "attributes are unavailable",
             )
         ]
+    if remote.device == duthost.hostname:
+        remote_port_mapping = local_port_mapping
+    else:
+        try:
+            remote_port_mapping = get_lport_to_first_subport_mapping(
+                remote.host,
+            )
+        except Exception as error:
+            return None, [
+                "{} peer DUT {} mapping failed: {}".format(
+                    local_port,
+                    remote.device,
+                    error,
+                )
+            ]
     if remote.primary_port not in remote_port_attributes:
         return None, [
             "{} peer port {}:{} is not present in that DUT's port_attributes_dict".format(
@@ -636,7 +641,7 @@ def test_dom_data_during_interface_state_changes(
     conn_graph_facts,
     dom_primary_ports,
     port_attributes_for_dut,
-    lport_to_first_subport_mapping_for_dut,
+    lport_to_first_subport_mapping,
 ):
     """Verify local and remote DOM state transitions across shut/no-shut."""
     all_failures = []
@@ -650,7 +655,7 @@ def test_dom_data_during_interface_state_changes(
             conn_graph_facts,
             local_port,
             port_attributes_for_dut,
-            lport_to_first_subport_mapping_for_dut,
+            lport_to_first_subport_mapping,
         )
         if config_errors:
             all_failures.append(
