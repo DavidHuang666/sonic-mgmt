@@ -2,6 +2,7 @@
 import logging
 
 import pytest
+
 from tests.transceiver.attribute_parser.attribute_keys import (
     DOM_ATTRIBUTES_KEY,
 )
@@ -254,16 +255,11 @@ def _operation_context(
 ):
     """Return ``(context, errors)`` for one local primary port under test."""
     errors = []
-    local_port_attributes, local_attr_error = port_attributes_for_dut(
-        duthost.hostname,
-    )
+    local_port_attributes, local_attr_error = port_attributes_for_dut(duthost.hostname)
     if local_port_attributes is None:
-        return None, [
-            "{} has no transceiver attribute context: {}".format(
-                duthost.hostname,
-                local_attr_error or "attributes are unavailable",
-            )
-        ]
+        return None, ["{} has no transceiver attribute context: {}".format(
+            duthost.hostname, local_attr_error or "attributes are unavailable"
+        )]
 
     remote, error = resolve_remote_peer(
         duthost,
@@ -274,17 +270,13 @@ def _operation_context(
     if error:
         return None, [error]
 
-    remote_port_attributes, remote_attr_error = port_attributes_for_dut(
-        remote.device,
-    )
+    remote_port_attributes, remote_attr_error = port_attributes_for_dut(remote.device)
     if remote_port_attributes is None:
-        return None, [
-            "{} peer DUT {} has no transceiver attributes: {}".format(
-                local_port,
-                remote.device,
-                remote_attr_error or "attributes are unavailable",
-            )
-        ]
+        return None, ["{} peer DUT {} has no transceiver attributes: {}".format(
+            local_port,
+            remote.device,
+            remote_attr_error or "attributes are unavailable",
+        )]
     if remote.device == duthost.hostname:
         remote_port_mapping = local_port_mapping
     else:
