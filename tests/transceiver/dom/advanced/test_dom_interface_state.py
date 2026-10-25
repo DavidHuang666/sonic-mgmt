@@ -2,16 +2,15 @@
 import logging
 
 import pytest
-
-from tests.common.platform.interface_utils import (
-    get_lport_to_first_subport_mapping,
-)
 from tests.transceiver.attribute_parser.attribute_keys import (
     DOM_ATTRIBUTES_KEY,
 )
 from tests.transceiver.common import scenario_ops
 from tests.transceiver.common.db_helpers import STATE_DB_UPDATE_TIME_FIELD
-from tests.transceiver.common.topology import resolve_remote_peer
+from tests.transceiver.common.topology import (
+    get_cached_lport_to_first_subport_mapping,
+    resolve_remote_peer,
+)
 from tests.transceiver.dom.advanced.helpers import (
     build_dom_deviation_checks,
     dom_rx_power_flag_candidates,
@@ -290,7 +289,7 @@ def _operation_context(
         remote_port_mapping = local_port_mapping
     else:
         try:
-            remote_port_mapping = get_lport_to_first_subport_mapping(
+            remote_port_mapping = get_cached_lport_to_first_subport_mapping(
                 remote.host,
             )
         except Exception as error:
